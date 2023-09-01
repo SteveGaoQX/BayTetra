@@ -13,7 +13,9 @@ dep_packages <- c(
 )
 
 ### Check if the packages are already installed and install them if they are not
-new.packages <- dep_packages[!(dep_packages %in% installed.packages()[,"Package"])]\\
+new.packages <- dep_packages[!(dep_packages %in% installed.packages()[,"Package"])]
+
+
 if(length(new.packages)) {
     install.packages(new.packages)
 }
