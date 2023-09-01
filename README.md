@@ -5,7 +5,7 @@ BayTetra addresses an important task in the field of biomedical applications, te
 among different responses and employs B-splines, along with spike-and-slab priors on the spline coefficients, for flexible and parsimonious trajectory estimation. The package is inspired by the research paper ''BayTetra — A Bayesian
 Semiparametric Approach for Testing Trajectory Differences'' by Wei, J & Gao, Q & Xu, Y (2023).
 
-
+## Step to install the BayTetra
 ### List of dependent packages
 dep_packages <- c(
     "Rcpp", "RcppArmadillo", "MCMCpack", "MASS", "splines", "dplyr", "tmvtnorm", "Matrix",
@@ -21,7 +21,7 @@ if(length(new.packages)) {
 ### Now you can proceed to install the BayTetra package using BayTetra_0.1.0.tar.gz
 install.packages("BayTetra_0.1.0.tar.gz", repos = NULL)
 
-## the example code provides an example of how to quickly implements the BayTetra
+## Example_code.R provides an example of how to quickly implements the BayTetra
 
-
+## BayTetra.pdf is the Roxygen file introduced the details of BayTetra package
 
