@@ -6,22 +6,22 @@ among different responses and employs B-splines, along with spike-and-slab prior
 Semiparametric Approach for Testing Trajectory Differences'' by Wei, J & Gao, Q & Xu, Y (2023).
 
 
-## List of dependent packages
+### List of dependent packages
 dep_packages <- c(
     "Rcpp", "RcppArmadillo", "MCMCpack", "MASS", "splines", "dplyr", "tmvtnorm", "Matrix",
     "rstan", "mvtnorm", "truncnorm", "pracma", "loo"
 )
 
-## Check if the packages are already installed and install them if they are not
+### Check if the packages are already installed and install them if they are not
 new.packages <- dep_packages[!(dep_packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) {
     install.packages(new.packages)
 }
 
-## Now you can proceed to install the BayTetra package using BayTetra_0.1.0.tar.gz
+### Now you can proceed to install the BayTetra package using BayTetra_0.1.0.tar.gz
 install.packages("BayTetra_0.1.0.tar.gz", repos = NULL)
 
-And the example code provides an example of how to quickly implements the BayTetra
+## the example code provides an example of how to quickly implements the BayTetra
 
 
 
