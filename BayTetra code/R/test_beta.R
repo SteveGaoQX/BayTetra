@@ -51,3 +51,42 @@ test_beta <- function(beta) {
 
   list(beta_test_result = beta_test_result, beta_estimation = beta_estimation)
 }
+
+
+#' @noRd
+test_beta_Q1 <- function(beta) {
+  # hypothesis test and get the estimation
+  # Check that the array is of the correct dimensions
+
+  # Get the dimensions
+  num_samples <- dim(beta)[1]
+  K <- dim(beta)[2]
+  L <- dim(beta)[3]
+
+  # Pre-allocate result arrays
+  beta_test_result <- array(dim = c(K,  L))
+  beta_estimation <- array(dim = c(K, L))
+
+  # Calculate mean and standard deviation
+  beta_mean <- apply(beta, c(2,3), mean)
+
+  # Calculate the 95% confidence interval
+  ci_lower <- apply(beta, c(2,3), function(x) quantile(x, 0.025))
+  ci_upper <- apply(beta, c(2,3), function(x) quantile(x, 0.975))
+
+  # Test hypothesis
+  beta_test_result <- !(ci_lower <= 0 & ci_upper >= 0)
+
+  # Store mean as estimation
+  beta_estimation <- beta_mean
+
+  list(beta_test_result = beta_test_result, beta_estimation = beta_estimation)
+}
+
+
+
+
+
+
+
+

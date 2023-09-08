@@ -36,19 +36,21 @@
 #' @seealso [mcmc_BayTetra()]
 #' @importFrom utils modifyList
 #' @importFrom loo loo
+#' @importFrom stats dnorm
+
 #' @export
 
 
 Model_selection_BayTetra = function(df_min,df_max,
-                                  data,
-                                  v_rsp,
-                                  v_covs,
-                                  v_grp,
-                                  v_time,
-                                  mcmc = list(),
-                                  prior = list(),
-                                  display_process = TRUE
-                                  ) {
+                                    data,
+                                    v_rsp,
+                                    v_covs,
+                                    v_grp,
+                                    v_time,
+                                    mcmc = list(),
+                                    prior = list(),
+                                    display_process = TRUE
+) {
   Response_vec = v_rsp;
   total_columns = length(v_covs);
   S = as.integer(total_columns + 1) # add 1 column for intercept
@@ -206,8 +208,8 @@ Model_selection_BayTetra = function(df_min,df_max,
 
 
   elpd_list = list()
-  if(df_min < 4){
-    stop("df_min should be 4 or greater.")
+  if(df_min < 3){
+    stop("df_min should be 3 or greater.")
   }
   highest_elpd <- -Inf        # Initialize variable to track highest elpd
   best_mcmc_result <- NULL    # Initialize variable to store best mcmc_result
@@ -215,10 +217,12 @@ Model_selection_BayTetra = function(df_min,df_max,
   for (df in df_min:df_max) {
     print(paste0("Current df:", df))
 
+    if(df >= 3){
+      num_intervals <- df - 3
+      quantiles <- quantile(t, probs = seq(0, 1, 1/num_intervals), na.rm = TRUE)
+      middle_quantiles <- quantiles[-c(1, num_intervals + 1)]
+    }
 
-    num_intervals <- df - 3
-    quantiles <- quantile(t, probs = seq(0, 1, 1/num_intervals), na.rm = TRUE)
-    middle_quantiles <- quantiles[-c(1, num_intervals + 1)]
 
     if(df < 3) {
       stop("df must be at least 3.")
@@ -309,110 +313,231 @@ Model_selection_BayTetra = function(df_min,df_max,
 
 
     mcmc_result <- mcmc_BayTetra(data = data,
-                              v_rsp = Response_vec,
-                              v_covs = v_covs,
-                              v_grp = v_grp,
-                              v_time = v_time,
-                              df = df,
-                              prior = final_hyper_params,
-                              mcmc = final_simulation_params,
-                              display_process = display_process)
+                                 v_rsp = Response_vec,
+                                 v_covs = v_covs,
+                                 v_grp = v_grp,
+                                 v_time = v_time,
+                                 df = df,
+                                 prior = final_hyper_params,
+                                 mcmc = final_simulation_params,
+                                 display_process = display_process)
 
 
-    post_alpha_samples = mcmc_result$pos.alpha
-    post_beta_samples = mcmc_result$pos.beta
-    post_Sigma_omega_samples = mcmc_result$pos.Sigma_omega
-    post_sigma_samples = mcmc_result$pos.sigma2
-    post_gamma_kq_samples = mcmc_result$pos.gamma_kq
-    post_gamma_kq0_samples = mcmc_result$pos.gamma_kq0
-    # B = mcmc_result$B
-    # y = mcmc_result$y
-    # g = mcmc_result$g
-    # Z = mcmc_result$Z
-    # data_index = mcmc_result$data_index
-
-    beta_result = test_beta(post_beta_samples)
-    beta_estimate = beta_result$beta_estimation
-    beta_test = beta_result$beta_test_result
+    if(Q > 1){
+      post_alpha_samples = mcmc_result$pos.alpha
+      post_beta_samples = mcmc_result$pos.beta
+      post_Sigma_omega_samples = mcmc_result$pos.Sigma_omega
+      post_sigma_samples = mcmc_result$pos.sigma2
+      post_gamma_kq_samples = mcmc_result$pos.gamma_kq
+      post_gamma_kq0_samples = mcmc_result$pos.gamma_kq0
 
 
-    signal_all = extract_signal(post_gamma_kq_samples,
-                                post_gamma_kq0_samples)
-    signal_kq_real = signal_all$signal_kq_real
-    signal_kq0_real = signal_all$signal_kq0_real
-    signal_kq = signal_all$signal_kq
-    signal_kq0 = signal_all$signal_kq0
-
-    beta_update_result = update_beta_based_on_signal(post_beta_samples,beta_estimate,
-                                                     signal_kq,signal_kq0)
-    new_beta_samples = beta_update_result$new_beta_samples
-    new_beta_estimate = beta_update_result$new_beta_estimate
-    # estimation_alpha = estimate_alpha(post_alpha_samples)
-
-    post_sample_length = (Nit-burn_in)/thin_factor
+      beta_result = test_beta(post_beta_samples)
+      beta_estimate = beta_result$beta_estimation
+      beta_test = beta_result$beta_test_result
 
 
-    I <- dim(data_index)[1]
-    Q <- dim(data_index)[2]
-    J_max = dim(y)[3]
-    K = dim(post_beta_samples)[2]
-    L = dim(post_beta_samples)[4]
+      signal_all = extract_signal(post_gamma_kq_samples,
+                                  post_gamma_kq0_samples)
+      signal_kq_real = signal_all$signal_kq_real
+      signal_kq0_real = signal_all$signal_kq0_real
+      signal_kq = signal_all$signal_kq
+      signal_kq0 = signal_all$signal_kq0
+
+      beta_update_result = update_beta_based_on_signal(post_beta_samples,beta_estimate,
+                                                       signal_kq,signal_kq0)
+      new_beta_samples = beta_update_result$new_beta_samples
+      new_beta_estimate = beta_update_result$new_beta_estimate
+      # estimation_alpha = estimate_alpha(post_alpha_samples)
+
+      post_sample_length = (Nit-burn_in)/thin_factor
 
 
-    total_records <- dim(data)[1]
+      I <- dim(data_index)[1]
+      Q <- dim(data_index)[2]
+      J_max = dim(y)[3]
+      K = dim(post_beta_samples)[2]
+      L = dim(post_beta_samples)[4]
 
 
-    # Initialize model likelihood matrix
-    model_llh_matrix = array(0, dim = c(total_records, post_sample_length))
+      total_records <- dim(data)[1]
 
-    for (c in 1:post_sample_length) {
-      # c = 1
-      current_Sigma_omega = post_Sigma_omega_samples[c, , ]
-      current_alpha = post_alpha_samples[c, , ]
-      current_beta = new_beta_samples[c, , , ]
-      current_sigma2 = post_sigma_samples[c, ]
 
-      # Initialize a vector to store the log likelihood values
-      sum_ll = vector("numeric", length = total_records)
+      # Initialize model likelihood matrix
+      model_llh_matrix = array(0, dim = c(total_records, post_sample_length))
 
-      # Loop counters for filling up the sum_ll vector
-      counter = 1
+      for (c in 1:post_sample_length) {
+        # c = 1
+        current_Sigma_omega = post_Sigma_omega_samples[c, , ]
+        current_alpha = post_alpha_samples[c, , ]
+        current_beta = new_beta_samples[c, , , ]
+        current_sigma2 = post_sigma_samples[c, ]
 
-      for (i in 1:I) {
-        k = g[i]
-        data_index_iq = which(data_index[i,1,] == 1)
-        for (j in data_index_iq) {
-          # Initialize vectors for y_ij and mean
-          y_ij = vector("numeric", length = Q)
-          mean = vector("numeric", length = Q)
+        # Initialize a vector to store the log likelihood values
+        sum_ll = vector("numeric", length = total_records)
 
-          for (q in 1:Q) {
-            y_ij[q] = y[i,q,j]
-            if (k == K) {
-              mean[q] = t(Z[i,q,j, ])%*%current_alpha[q,] +
-                t(B[i,q,j, ])%*%current_beta[K,q,]
-            } else {
-              mean[q] = t(Z[i,q,j, ])%*%current_alpha[q,] +
-                t(B[i,q,j, ])%*%current_beta[K,q,] +
-                t(B[i,q,j, ])%*%current_beta[k,q,]
+        # Loop counters for filling up the sum_ll vector
+        counter = 1
+
+        for (i in 1:I) {
+          k = g[i]
+          data_index_iq = which(data_index[i,1,] == 1)
+          for (j in data_index_iq) {
+            # Initialize vectors for y_ij and mean
+            y_ij = vector("numeric", length = Q)
+            mean = vector("numeric", length = Q)
+
+            for (q in 1:Q) {
+              y_ij[q] = y[i,q,j]
+              if (k == K) {
+                mean[q] = t(Z[i,q,j, ])%*%current_alpha[q,] +
+                  t(B[i,q,j, ])%*%current_beta[K,q,]
+              } else {
+                mean[q] = t(Z[i,q,j, ])%*%current_alpha[q,] +
+                  t(B[i,q,j, ])%*%current_beta[K,q,] +
+                  t(B[i,q,j, ])%*%current_beta[k,q,]
+              }
             }
+
+            # Calculate sigma1, sigma2, and sigma_all
+            sigma1 = diag(current_sigma2)
+            sigma2 = current_Sigma_omega
+            sigma_all = sigma1 + sigma2
+            # print(sigma_all)
+            # Compute the log likelihood and store in sum_ll vector
+            sum_ll[counter] = dmvn_rcpp(y_ij, mean, sigma_all, logd = TRUE)
+
+            # Increment counter
+            counter = counter + 1
           }
-
-          # Calculate sigma1, sigma2, and sigma_all
-          sigma1 = diag(current_sigma2)
-          sigma2 = current_Sigma_omega
-          sigma_all = sigma1 + sigma2
-          # print(sigma_all)
-          # Compute the log likelihood and store in sum_ll vector
-          sum_ll[counter] = dmvn_rcpp(y_ij, mean, sigma_all, logd = TRUE)
-
-          # Increment counter
-          counter = counter + 1
         }
+
+        model_llh_matrix[, c] <- sum_ll
       }
 
-      model_llh_matrix[, c] <- sum_ll
+
+
+    }else{
+      y_cs = y[,1,]
+      Z_cs = Z[,1, , ]
+      B_cs = B[,1, , ]
+      data_index_cs = data_index[,1,]
+      # data_index = data_index[,1,]
+
+      post_alpha_samples = mcmc_result$pos.alpha
+      post_beta_samples = mcmc_result$pos.beta
+      post_sigma_samples = mcmc_result$pos.sigma2
+      post_gamma_kq_samples = mcmc_result$pos.gamma_kq
+      post_gamma_kq0_samples = mcmc_result$pos.gamma_kq0
+
+
+      beta_result = test_beta_Q1(post_beta_samples)
+      beta_estimate = beta_result$beta_estimation
+      beta_test = beta_result$beta_test_result
+
+      I <- dim(data_index_cs)[1]
+      J_max = dim(data_index_cs)[2]
+      K = dim(post_beta_samples)[2]
+      L = dim(post_beta_samples)[3]
+
+      signal_kq <- rep(0,K)
+      signal_kq0 <- rep(0,K)
+      signal_kq_real <- rep(0,K)
+      signal_kq0_real <- rep(0,K)
+
+      for (k in 1:K) {
+        prob_kq <- mean(post_gamma_kq_samples[ , k] == 1)
+        prob_kq0 <- mean(post_gamma_kq0_samples[ , k] == 1)
+        signal_kq_real[k] = prob_kq
+        signal_kq0_real[k] = prob_kq0
+        signal_kq[k] <- ifelse(prob_kq > 0.5, 1, 0)
+        signal_kq0[k] <- ifelse(prob_kq0 > 0.5, 1, 0)
+      }
+
+
+
+
+      # make a copy of the original beta samples
+      new_beta_samples = post_beta_samples
+      new_beta_estimate = beta_estimate
+
+
+      # loop over K and Q
+      for (k in 1:K) {
+
+        # if signal_kq[k,q] is 0, set new_beta_samples[, k, q, 2:L] to 0
+        if (signal_kq[k] == 0) {
+          new_beta_samples[, k,  2:L] <- 0
+          new_beta_estimate[k,2:L] = 0
+        }
+
+        # if signal_kq0[k,q] is 0, set new_beta_samples[, k, q, 1] to 0
+        if (signal_kq0[k] == 0) {
+          new_beta_samples[, k, 1] <- 0
+          new_beta_estimate[k,1] = 0
+        }
+
+      }
+
+
+
+
+
+      post_sample_length = (Nit-burn_in)/thin_factor
+      total_records <- dim(data)[1]
+
+      # Initialize model likelihood matrix
+      model_llh_matrix = array(0, dim = c(total_records, post_sample_length))
+
+      for (c in 1:post_sample_length) {
+        # c = 1
+        current_alpha = post_alpha_samples[c, ]
+        current_beta = new_beta_samples[c, , ]
+        current_sigma2 = post_sigma_samples[c]
+
+        # Initialize a vector to store the log likelihood values
+        sum_ll = vector("numeric", length = total_records)
+
+        # Loop counters for filling up the sum_ll vector
+        counter = 1
+
+        for (i in 1:I) {
+          k = g[i]
+          data_index_iq = which(data_index_cs[i,] == 1)
+          for (j in data_index_iq) {
+            # Initialize vectors for y_ij and mean
+            y_ij = 0
+            mean = 0
+
+
+            y_ij = y_cs[i,j]
+            if (k == K) {
+              mean = t(Z_cs[i,j, ])%*%current_alpha +
+                t(B_cs[i,j, ])%*%current_beta[K,]
+            } else {
+              mean = t(Z_cs[i,j, ])%*%current_alpha +
+                t(B_cs[i,j, ])%*%current_beta[K,] +
+                t(B_cs[i,j, ])%*%current_beta[k,]
+            }
+
+            sum_ll[counter] = dnorm(x = y_ij, mean = mean, sd = sqrt(current_sigma2),log = TRUE)
+            # Increment counter
+            counter = counter + 1
+          }
+        }
+
+        model_llh_matrix[, c] <- sum_ll
+      }
+
+
+
+
+
+
     }
+
+
+
 
     model_llh_matrix = t(model_llh_matrix)
 
@@ -429,6 +554,7 @@ Model_selection_BayTetra = function(df_min,df_max,
     }
 
   }
+
   selection_elpd <- unlist(lapply(elpd_list, function(x) x[[1]]))
   names(selection_elpd) <- paste0("df", df_min:df_max)
 
@@ -445,7 +571,5 @@ Model_selection_BayTetra = function(df_min,df_max,
 
   return(list(selection_elpd,best_mcmc_result) )
 }
-
-
 
 

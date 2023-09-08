@@ -116,6 +116,8 @@ mcmc_BayTetra <- function(data,
   Time_name = v_time
 
 
+
+
   data_index <- array(0, dim = c(I, Q, J_max))
 
   indice_problem <- list()  # Initialize list to store problematic indices
@@ -365,190 +367,375 @@ mcmc_BayTetra <- function(data,
   B = B_new
 
 
-  # mu_alpha <- rep(0, S)
-  # V_alpha <- diag(100, S)
-  V_alpha_inv <- chol2inv(chol(V_alpha))
-  V_alpha_inv_mu_alpha <- V_alpha_inv %*% mu_alpha
+  if(Q > 1){
+    V_alpha_inv <- chol2inv(chol(V_alpha))
+    V_alpha_inv_mu_alpha <- V_alpha_inv %*% mu_alpha
 
-  Z_sum <- array(0, dim=c(Q, S, S))
+    Z_sum <- array(0, dim=c(Q, S, S))
 
-  for (q in 1:Q) {
+
+    for (q in 1:Q){
+      for (i in 1:I){
+        k <- g[i]
+        data_index_iq <- which(data_index[i,q,] == 1)
+
+        if(length(data_index_iq)>1){
+          Z_sum[q,,] <- Z_sum[q,,] + t(Z[i,q,data_index_iq,])%*%Z[i,q,data_index_iq,]
+        } else if(length(data_index_iq)==1) {
+          Z_iq <- as.matrix(Z[i, q, data_index_iq, ])
+          Z_sum[q,,] <- Z_sum[q,,] + Z_iq %*% t(Z_iq)
+        }
+
+      }
+    }
+
+
+    B[is.na(B)] <- 0
+    Z[is.na(Z)] <- 0
+    y[is.na(y)] <- 0
+
+    B_cpp <- vector("list", I)
     for (i in 1:I) {
-      k <- g[i]
-      data_index_iq <- which(data_index[i,q,] == 1)
-      Z_sum[q,,] <- Z_sum[q,,] + t(Z[i,q,data_index_iq,])%*%Z[i,q,data_index_iq,]
+      B_cpp[[i]] <- B[i, , , ]
     }
-  }
 
-  # for (q in 1:Q) {
-  #   chol(Z_sum[q,,])
-  # }
-
-  B[is.na(B)] <- 0
-  Z[is.na(Z)] <- 0
-  y[is.na(y)] <- 0
-
-  B_cpp <- vector("list", I)
-  for (i in 1:I) {
-    B_cpp[[i]] <- B[i, , , ]
-  }
-
-  Z_cpp <- vector("list", I)
-  for (i in 1:I) {
-    Z_cpp[[i]] <- Z[i, , , ]
-  }
-
-  g_cpp = g-1
-
-
-  # Initialize MCMC storage object
-  mcmc <- list()
-
-  # Initialize alpha, beta, omega, Sigma_omega, sigma2
-  mcmc$alpha <- array(NA, dim=c(Nit, Q, S))
-  mcmc$omega <- array(NA, dim=c(I, Q))
-  mcmc$Sigma_omega <- array(NA, dim=c(Nit, Q, Q))
-  mcmc$sigma2 <- array(NA, dim=c(Nit, Q))
-  # Store additional parameters
-  mcmc$m_kq <- array(NA, dim=c(Nit, K, Q, L-1))
-  mcmc$xi_kq <- array(NA, dim=c(Nit, K, Q, L-1))
-  mcmc$rho <- array(NA, dim=c(Nit, 1))
-  mcmc$rho_0 <- array(NA,dim = c(Nit,1))
-  mcmc$nu_kq <- array(NA, dim=c(Nit, K, Q))
-  mcmc$nu_kq0 <- array(NA, dim=c(Nit, K, Q))
-  mcmc$gamma_kq <- array(NA, dim=c(Nit, K, Q))
-  mcmc$gamma_kq0 <- array(NA, dim=c(Nit, K, Q))
-  mcmc$eta_kq <- array(NA, dim=c(Nit, K, Q))
-  mcmc$beta_kq0 <- array(NA, dim=c(Nit, K, Q))
-  mcmc$beta_wo_intcp <- array(NA, dim=c(Nit, K, Q, L-1))
-  mcmc$beta_whole <- array(NA,dim = c(Nit, K,Q, L))
-
-  initial <- init(Q,S,K,L,I)
-
-
-  # Store initial values in the first row of mcmc
-  mcmc$alpha[1, , ] <- initial$alpha
-  mcmc$omega[ , ] <- initial$omega
-  mcmc$Sigma_omega[1, , ] <- initial$Sigma_omega
-  mcmc$sigma2[1, ] <- initial$sigma2
-  mcmc$m_kq[1, , , ] <- initial$m_kq
-  mcmc$xi_kq[1, , , ] <- initial$xi_kq
-  mcmc$rho[1] <- initial$rho
-  mcmc$rho_0[1] <- initial$rho_0
-  mcmc$nu_kq[1, , ] <- initial$nu_kq
-  mcmc$nu_kq0[1, , ] <- initial$nu_kq0
-  mcmc$gamma_kq[1, , ] <- initial$gamma_kq
-  mcmc$gamma_kq0[1, , ] <- initial$gamma_kq0
-  mcmc$eta_kq[1, , ] <- initial$eta_kq
-  mcmc$beta_kq0[1, , ] <- initial$beta_kq0
-  mcmc$beta_wo_intcp[1, , , ] <- initial$beta_wo_intcp
-  mcmc$beta_whole[1, , , ] <- initial$beta_whole
-
-
-
-  for (nit in 2:Nit) {
-    if (display_process == TRUE && nit %% 1000 == 0) {
-      print(paste0("current iteration ", nit))
+    Z_cpp <- vector("list", I)
+    for (i in 1:I) {
+      Z_cpp[[i]] <- Z[i, , , ]
     }
-    # update alpha
-    mcmc$alpha[nit,,] <- update_alpha_cpp(mcmc$beta_whole[nit-1,,,], mcmc$omega[,], c(mcmc$sigma2[nit-1,]),
-                                          data_index, y, B_cpp, Z_cpp, g_cpp, Z_sum,  V_alpha_inv,
-                                          V_alpha_inv_mu_alpha)
-    # update eta_kq
-    mcmc$eta_kq[nit, , ] = update_eta_kq_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit-1, , , ],
-                                             mcmc$omega[ , ],mcmc$sigma2[nit-1, ],
-                                             mcmc$beta_kq0[nit-1, , ], mcmc$xi_kq[nit-1, , ,],
-                                             mcmc$gamma_kq[nit-1, , ], mcmc$nu_kq[nit-1, , ],
-                                             y, Z_cpp, B_cpp,g_cpp,data_index
+
+    g_cpp = g-1
+
+
+    # Initialize MCMC storage object
+    mcmc <- list()
+
+    # Initialize alpha, beta, omega, Sigma_omega, sigma2
+    mcmc$alpha <- array(NA, dim=c(Nit, Q, S))
+    mcmc$omega <- array(NA, dim=c(I, Q))
+    mcmc$Sigma_omega <- array(NA, dim=c(Nit, Q, Q))
+    mcmc$sigma2 <- array(NA, dim=c(Nit, Q))
+    # Store additional parameters
+    mcmc$m_kq <- array(NA, dim=c(Nit, K, Q, L-1))
+    mcmc$xi_kq <- array(NA, dim=c(Nit, K, Q, L-1))
+    mcmc$rho <- array(NA, dim=c(Nit, 1))
+    mcmc$rho_0 <- array(NA,dim = c(Nit,1))
+    mcmc$nu_kq <- array(NA, dim=c(Nit, K, Q))
+    mcmc$nu_kq0 <- array(NA, dim=c(Nit, K, Q))
+    mcmc$gamma_kq <- array(NA, dim=c(Nit, K, Q))
+    mcmc$gamma_kq0 <- array(NA, dim=c(Nit, K, Q))
+    mcmc$eta_kq <- array(NA, dim=c(Nit, K, Q))
+    mcmc$beta_kq0 <- array(NA, dim=c(Nit, K, Q))
+    mcmc$beta_wo_intcp <- array(NA, dim=c(Nit, K, Q, L-1))
+    mcmc$beta_whole <- array(NA,dim = c(Nit, K,Q, L))
+
+    initial <- init(Q,S,K,L,I)
+
+
+    # Store initial values in the first row of mcmc
+    mcmc$alpha[1, , ] <- initial$alpha
+    mcmc$omega[ , ] <- initial$omega
+    mcmc$Sigma_omega[1, , ] <- initial$Sigma_omega
+    mcmc$sigma2[1, ] <- initial$sigma2
+    mcmc$m_kq[1, , , ] <- initial$m_kq
+    mcmc$xi_kq[1, , , ] <- initial$xi_kq
+    mcmc$rho[1] <- initial$rho
+    mcmc$rho_0[1] <- initial$rho_0
+    mcmc$nu_kq[1, , ] <- initial$nu_kq
+    mcmc$nu_kq0[1, , ] <- initial$nu_kq0
+    mcmc$gamma_kq[1, , ] <- initial$gamma_kq
+    mcmc$gamma_kq0[1, , ] <- initial$gamma_kq0
+    mcmc$eta_kq[1, , ] <- initial$eta_kq
+    mcmc$beta_kq0[1, , ] <- initial$beta_kq0
+    mcmc$beta_wo_intcp[1, , , ] <- initial$beta_wo_intcp
+    mcmc$beta_whole[1, , , ] <- initial$beta_whole
+
+
+
+    for (nit in 2:Nit) {
+      if (display_process == TRUE && nit %% 1000 == 0) {
+        print(paste0("current iteration ", nit))
+      }
+      # update alpha
+      mcmc$alpha[nit,,] <- update_alpha_cpp(mcmc$beta_whole[nit-1,,,], mcmc$omega[,], c(mcmc$sigma2[nit-1,]),
+                                            data_index, y, B_cpp, Z_cpp, g_cpp, Z_sum,  V_alpha_inv,
+                                            V_alpha_inv_mu_alpha)
+      # update eta_kq
+      mcmc$eta_kq[nit, , ] = update_eta_kq_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit-1, , , ],
+                                               mcmc$omega[ , ],mcmc$sigma2[nit-1, ],
+                                               mcmc$beta_kq0[nit-1, , ], mcmc$xi_kq[nit-1, , ,],
+                                               mcmc$gamma_kq[nit-1, , ], mcmc$nu_kq[nit-1, , ],
+                                               y, Z_cpp, B_cpp,g_cpp,data_index
+      )
+      #update xi_kq
+      mcmc$xi_kq[nit, , , ] = update_xi_kq_cpp(mcmc$alpha[nit, ,], mcmc$beta_wo_intcp[nit-1, , , ],
+                                               mcmc$omega[ ,], c(mcmc$sigma2[nit-1,]), mcmc$beta_kq0[nit-1, , ],
+                                               mcmc$eta_kq[nit, ,], mcmc$m_kq[nit-1, , , ],
+                                               g_cpp, data_index,y,Z_cpp,B_cpp)
+      # standardize these eta_kq and xi_kq
+      update_beta_wo_eta_xi_std_list = update_beta_wo_eta_xi_std(mcmc$eta_kq[nit, , ], mcmc$xi_kq[nit, , , ])
+      mcmc$beta_wo_intcp[nit, , , ] = update_beta_wo_eta_xi_std_list$current_beta_wo_intcp
+      mcmc$eta_kq[nit, , ] = update_beta_wo_eta_xi_std_list$eta_update_std
+      mcmc$xi_kq[nit, , ,] = update_beta_wo_eta_xi_std_list$xi_update_std
+
+      # update hyper parameter for non-intercept
+      mcmc$gamma_kq[nit, , ] = update_gamma_kq(mcmc$eta_kq[nit, , ],mcmc$rho[nit-1],nu_0, mcmc$nu_kq[nit-1, , ])
+      mcmc$nu_kq[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$eta_kq[nit, ,],mcmc$gamma_kq[nit, ,])
+      mcmc$rho[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq[nit, ,])
+      mcmc$m_kq[nit, ,,] = update_mkql(mcmc$xi_kq[nit, ,,])
+
+      # update intercept
+      mcmc$beta_kq0[nit, ,] = update_beta_kq0_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit, , ,],
+                                                  mcmc$omega[ ,],mcmc$sigma2[nit-1,],
+                                                  mcmc$gamma_kq0[nit-1,,],mcmc$nu_kq0[nit-1,,],
+                                                  y,Z_cpp,B_cpp,g_cpp,data_index)
+      # update the hyper parameters for intercept
+      mcmc$gamma_kq0[nit, ,] = update_gamma_kq(mcmc$beta_kq0[nit, ,], mcmc$rho_0[nit-1],nu_0,
+                                               mcmc$nu_kq0[nit-1,,],intercept = TRUE)
+
+      mcmc$nu_kq0[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$beta_kq0[nit, ,],mcmc$gamma_kq0[nit, ,],
+                                         intercept = TRUE)
+      mcmc$rho_0[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq0[nit, ,],intercept = TRUE)
+      # update a complete beta
+      mcmc$beta_whole[nit, , , ] = update_whole_beta(mcmc$beta_kq0[nit, ,],mcmc$beta_wo_intcp[nit, , ,])
+
+
+      # update omega
+      omega_new <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega,
+                                    c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,],
+                                    y, Z_cpp, B_cpp, g_cpp,
+                                    data_index)
+      mcmc$omega = omega_new
+      #mcmc$omega[nit,,] <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega[nit-1,,],
+      #                                      c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,],
+      #                                      y, Z_cpp, B_cpp, g_cpp,
+      #                                      data_index)
+      # update Sigma_omega
+
+      mcmc$Sigma_omega[nit,,] <- update_Sigma_omega_cpp(mcmc$omega[,], mcmc$Sigma_omega[nit-1,,])
+      # update sigma2
+      mcmc$sigma2[nit,] <- update_sigma2_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega,
+                                             y, Z_cpp, B_cpp, data_index, g_cpp,h_1, h_2)
+
+    }
+
+    # mcmc=mcmc_result
+    total_iterations = Nit
+    # Calculate the number of posterior samples
+    num_samples <- total_iterations - burn_in
+    # Generate the index list
+    index_list <- seq(burn_in+1, total_iterations, by = thin_factor)
+
+
+    post_alpha_samples = mcmc$alpha[index_list, , ]
+    post_beta_samples = mcmc$beta_whole[index_list, , , ]
+    post_Sigma_omega_samples = mcmc$Sigma_omega[index_list, , ]
+    post_sigma_samples = mcmc$sigma2[index_list, ]
+    post_gamma_kq_samples = mcmc$gamma_kq[index_list, , ]
+    post_gamma_kq0_samples = mcmc$gamma_kq0[index_list, , ]
+
+
+
+
+    post_samples <- list(
+      pos.alpha = post_alpha_samples,
+      pos.beta = post_beta_samples,
+      pos.Sigma_omega = post_Sigma_omega_samples,
+      pos.sigma2 = post_sigma_samples,
+      pos.gamma_kq = post_gamma_kq_samples,
+      pos.gamma_kq0 = post_gamma_kq0_samples
+
     )
-    #update xi_kq
-    mcmc$xi_kq[nit, , , ] = update_xi_kq_cpp(mcmc$alpha[nit, ,], mcmc$beta_wo_intcp[nit-1, , , ],
-                                             mcmc$omega[ ,], c(mcmc$sigma2[nit-1,]), mcmc$beta_kq0[nit-1, , ],
-                                             mcmc$eta_kq[nit, ,], mcmc$m_kq[nit-1, , , ],
-                                             g_cpp, data_index,y,Z_cpp,B_cpp)
-    # standardize these eta_kq and xi_kq
-    update_beta_wo_eta_xi_std_list = update_beta_wo_eta_xi_std(mcmc$eta_kq[nit, , ], mcmc$xi_kq[nit, , , ])
-    mcmc$beta_wo_intcp[nit, , , ] = update_beta_wo_eta_xi_std_list$current_beta_wo_intcp
-    mcmc$eta_kq[nit, , ] = update_beta_wo_eta_xi_std_list$eta_update_std
-    mcmc$xi_kq[nit, , ,] = update_beta_wo_eta_xi_std_list$xi_update_std
+    class(post_samples) = "Post_BayTetra"
+    # Return only the posterior samples
+    return(post_samples)
 
-    # update hyper parameter for non-intercept
-    mcmc$gamma_kq[nit, , ] = update_gamma_kq(mcmc$eta_kq[nit, , ],mcmc$rho[nit-1],nu_0, mcmc$nu_kq[nit-1, , ])
-    mcmc$nu_kq[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$eta_kq[nit, ,],mcmc$gamma_kq[nit, ,])
-    mcmc$rho[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq[nit, ,])
-    mcmc$m_kq[nit, ,,] = update_mkql(mcmc$xi_kq[nit, ,,])
+  }else{
 
-    # update intercept
-    mcmc$beta_kq0[nit, ,] = update_beta_kq0_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit, , ,],
-                                                mcmc$omega[ ,],mcmc$sigma2[nit-1,],
-                                                mcmc$gamma_kq0[nit-1,,],mcmc$nu_kq0[nit-1,,],
-                                                y,Z_cpp,B_cpp,g_cpp,data_index)
-    # update the hyper parameters for intercept
-    mcmc$gamma_kq0[nit, ,] = update_gamma_kq(mcmc$beta_kq0[nit, ,], mcmc$rho_0[nit-1],nu_0,
-                                             mcmc$nu_kq0[nit-1,,],intercept = TRUE)
+    # start to collapse the dim
 
-    mcmc$nu_kq0[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$beta_kq0[nit, ,],mcmc$gamma_kq0[nit, ,],
-                                       intercept = TRUE)
-    mcmc$rho_0[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq0[nit, ,],intercept = TRUE)
-    # update a complete beta
-    mcmc$beta_whole[nit, , , ] = update_whole_beta(mcmc$beta_kq0[nit, ,],mcmc$beta_wo_intcp[nit, , ,])
+    y_cs = y[,1,]
+    Z_cs = Z[,1, , ]
+    B_cs = B[,1, , ]
+    data_index_cs = data_index[,1,]
 
 
-    # update omega
-    omega_new <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega,
-                                  c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,],
-                                  y, Z_cpp, B_cpp, g_cpp,
-                                  data_index)
-    mcmc$omega = omega_new
-    #mcmc$omega[nit,,] <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega[nit-1,,],
-    #                                      c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,],
-    #                                      y, Z_cpp, B_cpp, g_cpp,
-    #                                      data_index)
-    # update Sigma_omega
 
-    mcmc$Sigma_omega[nit,,] <- update_Sigma_omega_cpp(mcmc$omega[,], mcmc$Sigma_omega[nit-1,,])
-    # update sigma2
-    mcmc$sigma2[nit,] <- update_sigma2_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ], mcmc$omega,
-                                           y, Z_cpp, B_cpp, data_index, g_cpp,h_1, h_2)
+    V_alpha_inv <- chol2inv(chol(V_alpha));
+    V_alpha_inv_mu_alpha <- V_alpha_inv %*% mu_alpha;
+
+
+    # pre-calculated data for saving running time
+    Z_sum <- array(0, dim=c(S, S))
+
+
+    for (i in 1:I){
+      k <- g[i]
+      data_index_iq <- which(data_index_cs[i,] == 1)
+
+      if(length(data_index_iq)>1){
+        Z_sum <- Z_sum + t(Z_cs[i,data_index_iq,])%*%Z_cs[i,data_index_iq,]
+
+      } else if(length(data_index_iq)==1) {
+        Z_iq <- as.matrix(Z_cs[i, data_index_iq, ])
+        Z_sum <- Z_sum + Z_iq %*% t(Z_iq)
+
+      }
+    }
+
+    y = y_cs
+    Z = Z_cs
+    B = B_cs
+    data_index = data_index_cs
+
+
+    B[is.na(B)] <- 0
+    Z[is.na(Z)] <- 0
+    y[is.na(y)] <- 0
+
+
+    g_cpp = g-1 # to match the index in Rcpp, so that g[i] from 0 to K-1
+
+
+    # Initialize MCMC storage object
+    mcmc <- list()
+
+    # Initialize alpha, beta, omega, Sigma_omega, sigma2
+    mcmc$alpha <- array(NA, dim=c(Nit,  S))
+    mcmc$sigma2 <- array(NA, dim=c(Nit))
+    # Store additional parameters
+    mcmc$m_kq <- array(NA, dim=c(Nit, K, L-1))
+    mcmc$xi_kq <- array(NA, dim=c(Nit, K, L-1))
+    mcmc$rho <- array(NA, dim=c(Nit))
+    mcmc$rho_0 <- array(NA,dim = c(Nit))
+    mcmc$nu_kq <- array(NA, dim=c(Nit, K))
+    mcmc$nu_kq0 <- array(NA, dim=c(Nit, K))
+    mcmc$gamma_kq <- array(NA, dim=c(Nit, K))
+    mcmc$gamma_kq0 <- array(NA, dim=c(Nit, K))
+    mcmc$eta_kq <- array(NA, dim=c(Nit, K))
+    mcmc$beta_kq0 <- array(NA, dim=c(Nit, K))
+    mcmc$beta_wo_intcp <- array(NA, dim=c(Nit, K,  L-1))
+    mcmc$beta_whole <- array(NA,dim = c(Nit, K, L))
+
+    initial <- init_Q1(Q,S,K,L,I)
+
+
+    # Store initial values in the first row of mcmc
+    mcmc$alpha[1, ] <- initial$alpha
+    mcmc$sigma2[1] <- initial$sigma2
+    mcmc$m_kq[1, ,  ] <- initial$m_kq
+    mcmc$xi_kq[1, , ] <- initial$xi_kq
+    mcmc$rho[1] <- initial$rho
+    mcmc$rho_0[1] <- initial$rho
+    mcmc$nu_kq[1, ] <- initial$nu_kq
+    mcmc$nu_kq0[1, ] <- initial$nu_kq0
+    mcmc$gamma_kq[1, ] <- initial$gamma_kq
+    mcmc$gamma_kq0[1,  ] <- initial$gamma_kq
+    mcmc$eta_kq[1, ] <- initial$eta_kq
+    mcmc$beta_kq0[1, ] <- initial$beta_kq0
+    mcmc$beta_wo_intcp[1, , ] <- initial$beta_wo_intcp
+    mcmc$beta_whole[1, , ] <- initial$beta_whole
+
+
+    for (nit in 2:Nit) {
+      if (display_process == TRUE && nit %% 1000 == 0) {
+        print(paste0("current iteration ", nit))
+      }
+      mcmc$alpha[nit,] <- update_alpha_Q1_cpp(mcmc$beta_whole[nit-1,,],mcmc$sigma2[nit-1],
+                                              data_index, y, B, Z, g_cpp, Z_sum,  V_alpha_inv,
+                                              V_alpha_inv_mu_alpha)
+      # update eta_kq
+      mcmc$eta_kq[nit, ] = update_eta_kq_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_wo_intcp[nit-1, , ],
+                                                mcmc$sigma2[nit-1],
+                                                mcmc$beta_kq0[nit-1, ], mcmc$xi_kq[nit-1, , ],
+                                                mcmc$gamma_kq[nit-1, ], mcmc$nu_kq[nit-1,  ],
+                                                y, Z, B,g_cpp,data_index)
+
+      mcmc$xi_kq[nit, , ] = update_xi_kq_Q1_cpp(mcmc$alpha[nit, ], mcmc$beta_wo_intcp[nit-1, , ],
+                                                mcmc$sigma2[nit-1], mcmc$beta_kq0[nit-1, ],
+                                                mcmc$eta_kq[nit, ], mcmc$m_kq[nit-1, ,  ],
+                                                g_cpp, data_index,y,Z,B)
+
+      # standardize these eta_kq and xi_kq
+      update_beta_wo_eta_xi_std_list = update_beta_wo_eta_xi_std_Q1(mcmc$eta_kq[nit, ], mcmc$xi_kq[nit, , ])
+      mcmc$beta_wo_intcp[nit, , ] = update_beta_wo_eta_xi_std_list$current_beta_wo_intcp
+      mcmc$eta_kq[nit,  ] = update_beta_wo_eta_xi_std_list$eta_update_std
+      mcmc$xi_kq[nit, , ] = update_beta_wo_eta_xi_std_list$xi_update_std
+
+      # update hyper parameter for non-intercept
+      mcmc$gamma_kq[nit,  ] = update_gamma_kq_Q1(mcmc$eta_kq[nit,  ],mcmc$rho[nit-1],nu_0, mcmc$nu_kq[nit-1,  ])
+
+      mcmc$nu_kq[nit, ] = update_nu_kq_Q1(a_nu,b_nu,mcmc$eta_kq[nit, ],mcmc$gamma_kq[nit, ])
+      mcmc$rho[nit] = update_rho_kq_Q1(a_rho,b_rho,mcmc$gamma_kq[nit, ])
+
+      mcmc$m_kq[nit, ,] = update_mkql_Q1(mcmc$xi_kq[nit, ,])
+
+
+      # update intercept
+      mcmc$beta_kq0[nit, ] = update_beta_kq0_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_wo_intcp[nit, , ],
+                                                    mcmc$sigma2[nit-1], mcmc$gamma_kq0[nit-1,],
+                                                    mcmc$nu_kq0[nit-1,],
+                                                    y,Z,B,g_cpp,data_index)
+
+      # update the hyper parameters for intercept
+      mcmc$gamma_kq0[nit, ] = update_gamma_kq_Q1(mcmc$beta_kq0[nit, ], mcmc$rho_0[nit-1],nu_0,
+                                                 mcmc$nu_kq0[nit-1,],intercept = TRUE)
+
+      mcmc$nu_kq0[nit, ] = update_nu_kq_Q1(a_nu,b_nu,mcmc$beta_kq0[nit, ],mcmc$gamma_kq0[nit, ],
+                                           intercept = TRUE)
+      mcmc$rho_0[nit] = update_rho_kq_Q1(a_rho,b_rho,mcmc$gamma_kq0[nit, ],intercept = TRUE)
+      # update a complete beta
+      mcmc$beta_whole[nit, , ] = update_whole_beta_Q1(mcmc$beta_kq0[nit, ],mcmc$beta_wo_intcp[nit, , ])
+
+
+
+      # update sigma2
+      mcmc$sigma2[nit] <- update_sigma2_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_whole[nit, , ],
+                                               y,Z,B, data_index , g_cpp,h_1,h_2)
+
+    }
+
+
+
+
+    # mcmc=mcmc_result
+    total_iterations = Nit
+    # Calculate the number of posterior samples
+    num_samples <- total_iterations - burn_in
+    # Generate the index list
+    index_list <- seq(burn_in+1, total_iterations, by = thin_factor)
+
+
+
+
+    post_alpha_samples = mcmc$alpha[index_list,  ]
+    post_beta_samples = mcmc$beta_whole[index_list,  , ]
+    post_sigma_samples = mcmc$sigma2[index_list]
+    post_gamma_kq_samples = mcmc$gamma_kq[index_list, ]
+    post_gamma_kq0_samples = mcmc$gamma_kq0[index_list, ]
+
+
+    post_samples <- list(
+      pos.alpha = post_alpha_samples,
+      pos.beta = post_beta_samples,
+      pos.sigma2 = post_sigma_samples,
+      pos.gamma_kq = post_gamma_kq_samples,
+      pos.gamma_kq0 = post_gamma_kq0_samples
+    )
+    class(post_samples) = "Post_BayTetra"
+    # Return only the posterior samples
+    return(post_samples)
+
+
 
   }
 
-  # mcmc=mcmc_result
-  total_iterations = Nit
-  # Calculate the number of posterior samples
-  num_samples <- total_iterations - burn_in
-  # Generate the index list
-  index_list <- seq(burn_in+1, total_iterations, by = thin_factor)
-
-
-  post_alpha_samples = mcmc$alpha[index_list, , ]
-  post_beta_samples = mcmc$beta_whole[index_list, , , ]
-  post_Sigma_omega_samples = mcmc$Sigma_omega[index_list, , ]
-  post_sigma_samples = mcmc$sigma2[index_list, ]
-  post_gamma_kq_samples = mcmc$gamma_kq[index_list, , ]
-  post_gamma_kq0_samples = mcmc$gamma_kq0[index_list, , ]
 
 
 
-
-  post_samples <- list(
-    pos.alpha = post_alpha_samples,
-    pos.beta = post_beta_samples,
-    pos.Sigma_omega = post_Sigma_omega_samples,
-    pos.sigma2 = post_sigma_samples,
-    pos.gamma_kq = post_gamma_kq_samples,
-    pos.gamma_kq0 = post_gamma_kq0_samples
-    # B = B,
-    # y = y,
-    # Z = Z,
-    # g = g,
-    # data_index = data_index
-  )
-  class(post_samples) = "Post_BayTetra"
-  # Return only the posterior samples
-  return(post_samples)
 
 }
+
 
 
 

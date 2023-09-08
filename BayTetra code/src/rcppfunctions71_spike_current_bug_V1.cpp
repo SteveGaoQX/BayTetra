@@ -850,6 +850,472 @@ arma::vec update_sigma2_cpp(arma::mat& alpha, arma::cube& beta, arma::mat& omega
 
 
 
+//' @noRd
+// [[Rcpp::export]]
+arma::vec update_alpha_Q1_cpp(const arma::mat& beta, const double& sigma2,
+                              const arma::mat& data_index, const arma::mat& y, const arma::cube& B,
+                              const arma::cube& Z, const arma::vec& g, const arma::mat& Z_sum,
+                              const arma::mat& V_alpha_inv, const arma::vec& V_alpha_inv_mu_alpha){
+  // Update the alpha
+  // args: 1: beta is K*L at t-1 time
+  //       3: sigma2 is double
+  // returns: the updates alpha
+
+
+  // Get dimensions from the data
+  int K = beta.n_rows;
+  //int Q = beta.n_cols;
+  int S = Z_sum.n_cols; // Z_sum in dim S*S
+  int I = g.n_elem;
+  //cout<< "K:" << K << "S:" << S << "I:" << I <<endl;
+  arma::vec alpha_update(S);
+  arma::mat V_n(S, S);
+  arma::vec mu_n(S);
+  arma::vec Zy_sum(S, arma::fill::zeros);
+
+  for (int i = 0; i < I; i++){
+    //cout << "i:" << i <<"\n"<< endl;
+    int k = g[i] ;
+    //cout <<"k: " << k <<"\n" << endl;
+    arma::uvec data_index_iq = arma::find(data_index.row(i) == 1);
+    arma::mat B_iq_raw  = B.row_as_mat(i).t();
+    //cout<< "B_iq_raw:"<< B_iq_raw<<"\n" << endl;
+
+    arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+    //cout<< "B_iq" << B_iq<< "\n" << endl;
+    arma::vec beta_kq = arma::vectorise(beta.row(k));
+    arma::vec beta_Kq = arma::vectorise(beta.row(K-1));
+    //cout<< "beta_kq:"<< beta_kq<<"\n" << endl;
+    //cout<< "beta_Kq:"<< beta_Kq<<"\n" << endl;
+
+    arma::vec y_vec = arma::vectorise(y.row(i));
+    arma::vec y_selected = y_vec.elem(data_index_iq);
+    arma::vec y_tilde_iq;
+    if (k == K-1){ // baseline
+      y_tilde_iq = y_selected - B_iq * beta_Kq;
+    } else { // not baseline
+      y_tilde_iq = y_selected - B_iq * beta_Kq -
+        B_iq * beta_kq;
+    }
+    //cout<< "y_tilde_iq" << y_tilde_iq<<endl;
+    arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+    arma::mat Z_selected = Z_iq_raw.rows(data_index_iq);
+    //cout << "Z_selected" << Z_selected << endl;
+    Zy_sum += Z_selected.t() * y_tilde_iq;
+  }
+  //cout <<"Zy_sum" << Zy_sum<<"\n"<< endl;
+  V_n = arma::inv(Z_sum / sigma2 + V_alpha_inv);
+  mu_n = V_n * (Zy_sum / sigma2 + V_alpha_inv_mu_alpha);
+  //cout << "V_n" << V_n << "\n"<< endl;
+  //cout << "mu_n" <<mu_n<< "\n" << endl;
+  alpha_update = mvnrnd(mu_n,V_n);
+  //cout<< "K:" << K << "S:" << S << "I:" << I <<endl;
+  return alpha_update;
+}
+
+
+//' @noRd
+// [[Rcpp::export]]
+arma::vec update_eta_kq_Q1_cpp(const arma::vec& alpha, const arma::mat& beta,
+                               const double sigma2, const arma::vec& beta_kq0,
+                               const arma::mat& xi, const arma::vec& gamma_kq, const arma::vec& nu_kq,
+                               const arma::mat& y, const arma::cube& Z, const arma::cube& B, const arma::vec& g_cpp, const arma::mat& data_index){
+
+  int K = beta.n_rows;
+  //cout<< "K:"<< K <<" \n ; "<<endl;
+  // here the beta is at dim K*L-1
+  int L = beta.n_cols + 1;
+  //cout<< "L:" << L <<" \n ; "<<endl;
+  int I = y.n_rows;
+  int J_max = y.n_cols;
+  arma::vec eta_update(K, arma::fill::zeros);
+  //cout<< "eta_update:" << eta_update<< endl;
+  for (int k = 0; k < K-1; ++k){
+    double Sigma_eta_sum = 0;
+    double mu_eta_sum = 0;
+    arma::uvec index_k = find(g_cpp == k);
+    arma::vec beta_Kq = arma::vectorise(beta.row(K-1)); // this can be put outside the for loop for i
+    //cout<< "beta_wo_intc K:"<< beta_Kq<<endl;
+    for (auto i : index_k){
+      //cout<< "current i:" << index_k << endl;
+
+      arma::uvec data_index_iq = find(data_index.row(i) == 1);
+      int Iq_j = data_index_iq.size();
+      arma::vec y_tilde_iq;
+
+      arma::mat B_iq_raw  = B.subcube(i,0,1,i, J_max-1,L-1);
+      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+      //cout<< "B_iq"<< B_iq <<"\n"<<endl;
+      arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+      //Rcpp::Rcout << "Z_iq: " << Z_iq<<"\n" << std::endl;
+
+      arma::vec y_vec = arma::vectorise(y.row(i));
+      arma::vec y_selected = y_vec.elem(data_index_iq);
+      //Rcpp::Rcout << "y_selected: " << y_selected <<" \n "<< std::endl;
+      arma::vec alpha_q = alpha;
+
+      //
+      arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
+      beta_intcp_vec.fill(beta_kq0(k));
+
+      y_tilde_iq = y_selected - Z_iq * alpha_q -
+        B_iq* beta_Kq - beta_intcp_vec;
+      //cout<< "y_tilde_iq:"<< y_tilde_iq<<"\n"<< endl;
+      arma::vec B_iqj_wcoeff = trans(B_iq) * y_tilde_iq;
+      //cout << "B_iqj_wcoeff : " << B_iqj_wcoeff<<" \n " << std::endl;
+      arma::vec xi_kq = xi.row(k).t();
+      //cout << "xi_kq: " << xi_kq <<" \n " << std::endl;
+
+      mu_eta_sum = mu_eta_sum + dot(B_iqj_wcoeff, xi_kq);
+      //cout << "dot result: " << dot(B_iqj_wcoeff, xi_kq) << std::endl;
+
+      arma::vec vi = B_iq * xi_kq;
+      //Rcpp::Rcout << "vi: " << vi << std::endl;
+
+      Sigma_eta_sum = Sigma_eta_sum + dot(vi,vi);
+      //Rcpp::Rcout << "Sigma_eta_sum: " << Sigma_eta_sum << std::endl;
+    }
+
+    double sigma_eta = 1/ (Sigma_eta_sum/sigma2 + 1/(gamma_kq(k)*nu_kq(k)));
+    //sigma_eta = abs(sigma_eta);
+    //Rcpp::Rcout << "sigma_eta " << sigma_eta << std::endl;
+
+    double mu_eta = sigma_eta*mu_eta_sum/sigma2;
+    eta_update(k) = arma::randn( distr_param(mu_eta,sqrt(sigma_eta)) );
+    //cout<< "finish k:" << k << endl;
+  }
+  // cout<<"update baseline"<< endl;
+  // update the baseline
+  arma::mat Sigma_eta_sum_K(L-1, L-1, arma::fill::zeros);
+  arma::vec mu_eta_sum_K(L-1, arma::fill::zeros);
+
+  for (int i = 0; i < I; ++i){
+    //cout<<"i: "<< i<< "\n"<<endl;
+    int k = g_cpp(i);
+
+    arma::uvec data_index_iq = find(data_index.row(i) == 1);
+    int Iq_j = data_index_iq.size();
+    arma::vec y_tilde_iq;
+
+    arma::mat B_iq_raw  = B.subcube(i,0,1,i, J_max-1,L-1);
+    arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+    //cout<<"B_iq:"<<B_iq <<endl;
+    arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+    arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+    //Rcpp::Rcout << "Z_iq: " << Z_iq << std::endl;
+
+    arma::vec y_vec = arma::vectorise(y.row(i));
+    arma::vec y_selected = y_vec.elem(data_index_iq);
+    //Rcpp::Rcout << "y_selected: " << y_selected << std::endl;
+    arma::vec alpha_q = alpha;
+
+    if (k == K-1){
+      y_tilde_iq = y_selected - Z_iq*alpha_q ;
+    } else{
+      arma::vec beta_kq = arma::vectorise(beta.row(k));
+      arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
+      beta_intcp_vec.fill(beta_kq0(k));
+
+      y_tilde_iq = y_selected - Z_iq*alpha_q -
+        B_iq*beta_kq - beta_intcp_vec;
+    }
+    //cout<< "y_tilde_iq:" << y_tilde_iq<< endl;
+    arma::vec B_iqj_wcoeff = trans(B_iq) * y_tilde_iq;
+    //cout<< "B_iqj"<<endl;
+    mu_eta_sum_K = mu_eta_sum_K + B_iqj_wcoeff;
+
+    arma::mat vi = trans(B_iq) * B_iq;
+    //cout<< "vi :"<< vi<< endl;
+    Sigma_eta_sum_K = Sigma_eta_sum_K + vi;
+  }
+  //cout<< "Sigma"<< Sigma_eta_sum_K << endl;
+  arma::vec xi_Kq = xi.row(K-1).t();
+  //cout<< "xi_Kq: " << xi_Kq << endl;
+  arma::mat Sigma_eta_sum_trans = trans(xi_Kq)*Sigma_eta_sum_K*xi_Kq;
+  //Rcpp::Rcout << "Sigma_eta_sum_trans " << Sigma_eta_sum_trans << std::endl;
+
+  double trans_scalar = arma::as_scalar(Sigma_eta_sum_trans);
+  //Rcpp::Rcout << "trans_scalar " << trans_scalar << std::endl;
+
+  double sigma_eta = 1/ (trans_scalar/sigma2 + 1/(gamma_kq(K-1)*nu_kq(K-1)));
+  sigma_eta = abs(sigma_eta);
+  //Rcpp::Rcout << "sigma_eta " << sigma_eta << std::endl;
+
+  double mu_eta = sigma_eta*(dot(mu_eta_sum_K, xi_Kq))/sigma2;
+  eta_update(K-1) = arma::randn( distr_param(mu_eta,sqrt(sigma_eta)) );
+
+
+  return eta_update;
+}
+
+
+//' @noRd
+//[[Rcpp::export]]
+arma::mat update_xi_kq_Q1_cpp(const arma::vec& alpha, const arma::mat& beta,
+                              const double sigma2, const arma::vec& beta_kq0, const arma::vec& eta,
+                              const arma::mat& m,
+                              const arma::vec& g_cpp, const arma::mat& data_index,
+                              const arma::mat& y, const arma::cube& Z, const arma::cube& B){
+  // beta K*(L-1)
+  int K = beta.n_rows;
+  //int Q = beta.n_cols;
+  int L = beta.n_cols +1;
+  int I = y.n_rows;
+  int J_max = y.n_cols;
+
+  arma::mat xi_kq_update(K, L-1, arma::fill::zeros);
+
+  // update xi_kq, k = 1,2,...,K-1
+  for (int k = 0; k < K-1; k++){
+
+    arma::vec beta_Kq = beta.row(K-1).t(); // this can be put outside the for loop for i
+
+    // Indexes for subject in k-th class
+    arma::uvec index_k = arma::find(g_cpp == k);
+    // Initialize sum values
+    arma::mat Sigma_xi_sum(L-1, L-1, arma::fill::zeros);
+    arma::vec mu_xi_sum(L-1, arma::fill::zeros);
+    for (auto i : index_k){
+      arma::uvec data_index_iq = find(data_index.row(i) == 1);
+      int Iq_j = data_index_iq.size();
+
+      arma::mat B_iq_raw  = B.subcube(i,0,1,i, J_max-1,L-1);
+      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+      //cout<< "B_iq"<< B_iq <<"\n"<<endl;
+      arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+      //cout << "Z_iq: " << Z_iq<<"\n" << std::endl;
+
+      arma::vec y_vec = arma::vectorise(y.row(i));
+      arma::vec y_selected = y_vec.elem(data_index_iq);
+      //cout << "y_selected: " << y_selected <<" \n "<< std::endl;
+      arma::vec alpha_q = alpha;
+
+      //
+      arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
+      beta_intcp_vec.fill(beta_kq0(k));
+
+      arma::vec y_tilde_iq;
+      y_tilde_iq = y_selected - Z_iq * alpha_q -
+        B_iq* beta_Kq - beta_intcp_vec;
+
+      //cout<< "y_tilde_iq" << y_tilde_iq<< endl;
+      //arma::mat B_iqj = B_iq; //J*(L-1)
+      arma::vec B_iqj_wcoeff = trans(B_iq) * y_tilde_iq;
+
+      arma::mat vi = trans(B_iq) * B_iq; //(L-1)*(L-1)
+      Sigma_xi_sum = Sigma_xi_sum + vi;
+
+      mu_xi_sum = mu_xi_sum + B_iqj_wcoeff;
+    }
+    //cout<<"finish loops for i"<< endl;
+    // posterior mean and covariance matrix
+    arma::mat Identity = arma::eye(L-1, L-1);
+    arma::mat V_xi = arma::inv_sympd(Sigma_xi_sum*(pow(eta(k),2)/sigma2) + Identity);
+    arma::vec m_kq = m.row(k).t();
+    arma::vec mu_xi = V_xi * (eta(k)/sigma2*mu_xi_sum + m_kq);
+    //cout<< "mu_xi"<< mu_xi <<endl;
+    arma::vec xi_temp_K = arma::mvnrnd(mu_xi, V_xi); // Draw from multivariate normal distribution
+    arma::rowvec xi_temp_K_row = xi_temp_K.t(); // Transpose to a row vector
+    xi_kq_update.row(k) = xi_temp_K_row; // Store row vector
+  }
+
+  //update baseline
+  // Initialize sum values
+  arma::mat Sigma_xi_sum_K(L-1, L-1, arma::fill::zeros);
+  arma::vec mu_xi_sum_K(L-1, arma::fill::zeros);
+
+  for (int i = 0; i < I; i++){
+    //cout << "i :" << i<< endl;
+    int k = g_cpp(i);
+    arma::uvec data_index_iq = find(data_index.row(i) == 1);
+    int Iq_j = data_index_iq.size();
+    arma::vec y_tilde_iq;
+
+    arma::mat B_iq_raw  = B.subcube(i,0,1,i, J_max-1,L-1);
+    arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+    //cout<< "B_iq"<< B_iq <<"\n"<<endl;
+    arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+    arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+    //Rcpp::Rcout << "Z_iq: " << Z_iq<<"\n" << std::endl;
+
+    arma::vec y_vec = arma::vectorise(y.row(i));
+    arma::vec y_selected = y_vec.elem(data_index_iq);
+    //Rcpp::Rcout << "y_selected: " << y_selected <<" \n "<< std::endl;
+    arma::vec alpha_q = alpha;
+
+
+
+    if (k == K-1){
+      y_tilde_iq = y_selected - Z_iq*alpha_q;
+    } else{
+      arma::vec beta_kq = beta.row(k).t();
+      arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
+      beta_intcp_vec.fill(beta_kq0(k));
+      y_tilde_iq = y_selected - Z_iq*alpha_q -
+        B_iq*beta_kq - beta_intcp_vec;
+    }
+    //cout<< "y_tilde"<< y_tilde_iq<< endl;
+
+    //arma::mat B_iqj = B_iq;
+    arma::vec B_iqj_wcoeff = trans(B_iq) * y_tilde_iq;
+
+    arma::mat vi = trans(B_iq) * B_iq;
+    Sigma_xi_sum_K = Sigma_xi_sum_K + vi;
+
+    mu_xi_sum_K = mu_xi_sum_K + B_iqj_wcoeff;
+  }
+  //cout<< "finish loops for baseline"<< endl;
+  // posterior mean and covariance matrix
+  arma::mat Identity = arma::eye(L-1, L-1);
+  arma::mat V_xi = arma::inv_sympd(Sigma_xi_sum_K*(pow(eta(K-1),2)/sigma2) + Identity);
+  arma::vec m_Kq = m.row(K-1).t();
+  arma::vec mu_xi = V_xi * ((eta(K-1)/sigma2)*mu_xi_sum_K + m_Kq);
+
+  arma::vec xi_temp_K = arma::mvnrnd(mu_xi, V_xi); // Draw from multivariate normal distribution
+  arma::rowvec xi_temp_K_row = xi_temp_K.t(); // Transpose to a row vector
+  xi_kq_update.row(K-1) = xi_temp_K_row;
+
+  return xi_kq_update;
+}
+
+//' @noRd
+// [[Rcpp::export]]
+arma::vec update_beta_kq0_Q1_cpp(const arma::vec& alpha, const arma::mat& beta,
+                                 const double sigma2, const arma::vec& gamma_kq0,
+                                 const arma::vec& nu_kq0,
+                                 const arma::mat& y, const arma::cube& Z, const arma::cube& B,
+                                 const arma::vec& g_cpp, const arma::mat& data_index){
+
+  int K = beta.n_rows;
+  int L = B.n_slices;
+  //int n = y.n_rows;
+  int J_max = B.n_cols;
+  arma::vec beta_kq0_update(K, arma::fill::zeros);
+
+  for (int k = 0; k < K-1; ++k){
+
+    double Sigma_beta_kq0_sum = 0;
+    double mu_beta_kq0_sum = 0;
+    arma::uvec index_k = find(g_cpp == k);
+    arma::vec beta_Kq = beta.row(K-1).t(); // this can be put outside the for loop for i
+    arma::vec beta_kq = beta.row(k).t(); // this can be put outside the for loop for i
+
+    //Rcpp::Rcout << "k = " << k << ", q = " << q << std::endl;
+
+    for (auto i : index_k){
+      arma::uvec data_index_iq = find(data_index.row(i) == 1);
+      //Rcpp::Rcout << "data_index_iq: " << data_index_iq << std::endl;
+      int Iq_j = data_index_iq.size();
+      arma::vec y_tilde_iq;
+      arma::mat B_iq_raw = B.subcube(i,0,1,i, J_max-1,L-1);
+      // B_iq_raw now is dim J_max*(L-1)
+      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+      arma::mat Z_iq_raw = Z.tube(i,0,i, J_max-1 );
+      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+      arma::vec y_vec = arma::vectorise(y.row(i));
+      arma::vec y_selected = y_vec.elem(data_index_iq);
+      arma::vec alpha_q = alpha;
+
+
+      y_tilde_iq = y_selected - Z_iq * alpha_q -
+        B_iq* beta_Kq - B_iq*beta_kq;
+
+      mu_beta_kq0_sum = mu_beta_kq0_sum + sum(y_tilde_iq);
+      //Rcpp::Rcout << "dot result: " << dot(B_iqj_wcoeff, xi_kq) << std::endl;
+
+      Sigma_beta_kq0_sum = Sigma_beta_kq0_sum + Iq_j;
+      //Rcpp::Rcout << "Sigma_beta_kq0_sum: " << Sigma_beta_kq0_sum << std::endl;
+    }
+
+    double sigma_beta_kq0 = 1/ (Sigma_beta_kq0_sum/sigma2 + 1/(gamma_kq0(k)*nu_kq0(k)));
+    //sigma_beta_kq0 = abs(sigma_beta_kq0);
+    //Rcpp::Rcout << "sigma_eta " << sigma_eta << std::endl;
+
+    double mu_beta_kq0 = sigma_beta_kq0*mu_beta_kq0_sum/sigma2;
+    beta_kq0_update(k) = arma::randn( distr_param(mu_beta_kq0,sqrt(sigma_beta_kq0)) );
+    //eta_update(k,q) = R::rnorm(mu_eta, sqrt(sigma_eta));
+
+  }
+  return beta_kq0_update;
+}
+
+
+
+
+
+//' @noRd
+// [[Rcpp::export]]
+double update_sigma2_Q1_cpp(arma::vec& alpha, arma::mat& beta,
+                            const arma::mat& y, const arma::cube& Z, const arma::cube& B,
+                            const arma::mat& data_index, const arma::vec& g, double h_1, double h_2){
+  int K = beta.n_rows;
+  //int Q = beta.n_cols;
+  int I = g.n_elem;
+  //int J_max = y.n_cols;
+
+  double sigma2_update;
+  // Print beta dimensions
+  //Rcpp::Rcout << "beta dimensions: " << beta.n_rows << " x " << beta.n_cols << " x " << beta.n_slices << "\n";
+
+  // Print K
+  //Rcpp::Rcout << "K: " << K << "\n";
+
+
+
+  //Rcpp::Rcout << "q : " << q << "\n";
+
+  double y_tilde_sum = 0.0;
+
+  int n_iq = arma::accu(data_index);
+
+  for (int i = 0; i < I; ++i){
+    int k = g(i); // index of class for i-th subject
+    //Rcpp::Rcout << "i : " << i << "\n";
+    //Rcpp::Rcout << "k : " << k << "\n";
+    arma::uvec data_index_iq = find(data_index.row(i) == 1);
+    //Rcpp::Rcout << "data_index_iq length: " << data_index_iq.n_elem << "\n";
+
+    //int Iq_j = data_index_iq.size();
+
+    arma::mat B_iq_raw  = B.row_as_mat(i).t();
+    arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+    //cout<< "B_iq"<< B_iq <<"\n"<<endl;
+    arma::mat Z_iq_raw = Z.row_as_mat(i).t();
+    arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+    //Rcpp::Rcout << "Z_iq: " << Z_iq<<"\n" << std::endl;
+
+    arma::vec y_vec = arma::vectorise(y.row(i));
+    arma::vec y_selected = y_vec.elem(data_index_iq);
+    //Rcpp::Rcout << "y_selected: " << y_selected <<" \n "<< std::endl;
+    arma::vec alpha_q = alpha;
+
+
+    arma::vec beta_Kq = beta.row(K-1).t();
+    //Rcpp::Rcout << "beta_Kq dimensions: " << beta_Kq.n_rows << " x " << beta_Kq.n_cols << "\n";
+
+    arma::vec y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq;
+    if (k != K) {
+      arma::vec beta_kq = beta.row(k).t();
+      //Rcpp::Rcout << "beta_kq dimensions: " << beta_kq.n_rows << " x " << beta_kq.n_cols << "\n";
+      y_tilde_iq -= B_iq * beta_kq;
+    }
+
+    y_tilde_sum += arma::accu(arma::square(y_tilde_iq));
+  }
+
+  double h_1_star = h_1 + n_iq / 2;
+  double h_2_star = h_2 + y_tilde_sum / 2;
+
+  sigma2_update = rinvgamma_rcpp(h_1_star, h_2_star);
+
+
+  return sigma2_update;
+}
+
+
+
 
 
 

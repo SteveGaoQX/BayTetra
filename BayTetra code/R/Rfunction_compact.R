@@ -202,3 +202,129 @@ update_whole_beta = function(beta_kq0, beta_wo_intcp){
 
 
 
+
+#' @noRd
+update_beta_wo_eta_xi_std_Q1 <- function(eta_update, xi_update) {
+  # get dimensions
+  K = dim(xi_update)[1]
+  L = dim(xi_update)[2] + 1
+
+  # Initialize output arrays
+  current_beta_wo_intcp = array(0,dim = c(K,L-1))
+  xi_update_std = array(0, dim = c(K,L-1))
+  eta_update_std =rep(0,K)
+
+  # Start the loops
+  for (k in 1:K) {
+
+    current_beta_wo_intcp[k,] = eta_update[k]*xi_update[k, ]
+    xi_kq_bar = mean(abs(xi_update[k,])) # xi_update length should be L-1
+    xi_update_std[k,] = xi_update[k,]/xi_kq_bar
+    eta_update_std[k] = eta_update[k]*xi_kq_bar
+
+  }
+
+  # return list with the updated variables
+  return(list(current_beta_wo_intcp = current_beta_wo_intcp,
+              xi_update_std = xi_update_std,
+              eta_update_std = eta_update_std))
+}
+
+
+
+#' @noRd
+update_gamma_kq_Q1 <- function(eta, rho,nu_0,nu, intercept = FALSE){
+  # update gamma
+  # args: eta (K,Q),rho(scalar),nu (K*Q), nu_0 (scalar)
+  # returns: update_gamma_kq
+  K = length(eta)
+  update_gamma <- rep(0,K)
+  if(intercept == TRUE){
+    K = K - 1
+  }
+  # update gamma, k = 1...K
+  for (k in 1:K) {
+
+    exp_num = (1 - nu_0)*(eta[k]^2)/(2*nu_0*nu[k])
+    if (exp_num>500){
+      update_gamma[k] = 1
+    }else{
+      # Compute the new gamma value
+      gamma_value <- (sqrt(nu_0) * rho / (1 - rho)) * exp(exp_num)
+      # Compute probabilities A and B
+      p1 <- 1 / (1 + gamma_value)
+      p0 <- 1 - p1
+      # Sample gamma[k, q] from a Bernoulli distribution with probability p1
+      update_gamma[k] <- sample(c(nu_0, 1),size=1, prob = c(p1,p0))
+    }
+
+  }
+  return(update_gamma)
+}
+
+
+#' @noRd
+update_nu_kq_Q1 = function(a_nu, b_nu, eta, gamma_kq,intercept = FALSE){
+  K = length(gamma_kq)
+  nu_update = rep(0,K)
+  if (intercept == TRUE){
+    K = K - 1
+  }
+  for (k in 1:K) {
+    shape_updated <- a_nu + 0.5
+    scale_updated <- b_nu + (eta[k]^2)/(2*gamma_kq[k])
+
+    # Sample from the Gamma distribution
+    gamma_sample <- rgamma(1, shape = shape_updated, rate = scale_updated)
+    nu_update[k] = 1/(gamma_sample)
+  }
+  return(nu_update)
+}
+
+#' @noRd
+update_rho_kq_Q1 <- function(a_rho, b_rho, gamma_kq, intercept = FALSE) {
+  K = length(gamma_kq)
+  # Adjust K if intercept is TRUE
+  if(intercept) {
+    K <- K - 1
+  }
+  # Define the indicator functions delta_1 and delta_nu_0. Replace conditions accordingly.
+  delta_1 <- function(x) ifelse(x == 1, 1, 0)     # replace condition accordingly
+  delta_nu_0 <- function(x) ifelse(x != 1, 1, 0)  # replace condition accordingly
+  # Only use the first K rows of gamma_kq
+  gamma_kq <- gamma_kq[1:K]
+  shape1_updated <- a_rho + sum(gamma_kq == 1)
+  #print(sum(apply(gamma_kq, c(1,2), delta_1)))
+  shape2_updated <- b_rho + sum(gamma_kq != 1)
+  rho_update<- rbeta(1, shape1_updated, shape2_updated)
+  # Return the updated rho matrix
+  return(rho_update)
+}
+
+#' @noRd
+update_mkql_Q1 = function(xi){
+  K = dim(xi)[1]
+  L = dim(xi)[2] # actually L-1 in formula
+  m_update = array(0, dim = c(K,L))
+  for (k in 1:K) {
+    for (l in 1:L) {
+      pos_prob = 1/(1+exp(-2*xi[k,l]))
+      neg_prob = 1- pos_prob
+      m_update[k, l] <- sample(c(-1,1),size = 1, prob = c(neg_prob,pos_prob))
+    }
+  }
+  return(m_update)
+}
+
+
+#' @noRd
+update_whole_beta_Q1 = function(beta_kq0, beta_wo_intcp){
+  K = dim(beta_kq0)[1]
+  L = dim(beta_wo_intcp)[2]+1
+  beta_whole_new = array(0, c(K,L))
+  beta_whole_new = cbind(beta_kq0, beta_wo_intcp)
+  return(beta_whole_new)
+}
+
+
+
