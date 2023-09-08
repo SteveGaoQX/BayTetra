@@ -21,7 +21,7 @@ if(length(new.packages)) {
 }
 
 ### Now you can proceed to install the BayTetra package using BayTetra_0.1.0.tar.gz
-install.packages("BayTetra_0.1.0.tar.gz", repos = NULL)
+install.packages("BayTetra_0.1.0.zip", repos = NULL)
 
 ## Example_code.R provides an example of how to quickly implements the BayTetra
 
