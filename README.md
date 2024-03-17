@@ -9,7 +9,7 @@ Semiparametric Approach for Testing Trajectory Differences'' by Jin, W & Gao, Q 
 ## 1.List of dependent packages
 dep_packages <- c(
     "Rcpp", "RcppArmadillo", "MCMCpack", "MASS", "splines", "Matrix",
-    "rstan", "mvtnorm", "truncnorm", "pracma", "GIGrvg"
+    "rstan", "mvtnorm", "truncnorm", "pracma","tmvtnorm","GIGrvg"
 )
 
 ## 2.Check if these necessary packages are already installed and install them if they are not
@@ -20,7 +20,9 @@ if(length(new.packages)) {
 }
 
 ## 3.Now you can proceed to install the BayTetra package using BayTetra_0.1.0.tar.gz (using local file)
-install.packages("BayTetra_0.1.0.tar.gz", repos = NULL), which is a source file, and the binary file name is "BayTetra_0.1.0_R_x86_64-pc-linux-gnu.tar.gz"
+install.packages("/path/to/BayTetra_0.1.0.tar.gz", repos = NULL, type = "source"), which is a source file, and the binary file name is "BayTetra_0.1.0_R_x86_64-pc-linux-gnu.tar.gz"\n
+
+\textcolor{red}{Notice: This Package need C++ Compiler, please make sure the C compiler is working on the machine, otherwise it will raise error when installing}.
 
 ## 4.Example_code.R provides an example of how to quickly implements the BayTetra
 
