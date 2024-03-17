@@ -25,7 +25,7 @@ install.packages("BayTetra_0.1.0.tar.gz", repos = NULL), which is a source file,
 ## 4.Example_code.R provides an example of how to quickly implements the BayTetra
 
 ## 5.if you want to use the ex_data inside the package, using:
-devtools::load_all("BayTetra") 
+devtools::load_all("BayTetra") ;\\
 data("ex_data", package = "BayTetra")
 
 
