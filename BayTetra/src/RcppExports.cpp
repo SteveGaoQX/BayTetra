@@ -82,77 +82,31 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_alpha_cpp
-arma::mat update_alpha_cpp(const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::cube& data_index, const arma::cube& y, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g, const arma::cube& Z_sum, const arma::mat& V_alpha_inv, const arma::vec& V_alpha_inv_mu_alpha);
-RcppExport SEXP _BayTetra_update_alpha_cpp(SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP data_indexSEXP, SEXP ySEXP, SEXP BSEXP, SEXP ZSEXP, SEXP gSEXP, SEXP Z_sumSEXP, SEXP V_alpha_invSEXP, SEXP V_alpha_inv_mu_alphaSEXP) {
+arma::mat update_alpha_cpp(const arma::cube& beta, const arma::mat& beta_kq0, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::cube& y, const arma::cube& data_index, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp, const arma::cube& Z_sum, const arma::mat& V_alpha_inv, const arma::vec& V_alpha_inv_mu_alpha);
+RcppExport SEXP _BayTetra_update_alpha_cpp(SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP, SEXP Z_sumSEXP, SEXP V_alpha_invSEXP, SEXP V_alpha_inv_mu_alphaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
     Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
     Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type Z_sum(Z_sumSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type V_alpha_inv(V_alpha_invSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type V_alpha_inv_mu_alpha(V_alpha_inv_mu_alphaSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_alpha_cpp(beta, omega, theta_iq, sigma2, data_index, y, B, Z, g, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha));
-    return rcpp_result_gen;
-END_RCPP
-}
-// update_eta_kq_cpp
-arma::mat update_eta_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& beta_kq0, const arma::cube& xi, const arma::mat& gamma_kq, const arma::mat& nu_kq, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g_cpp, const arma::cube& data_index);
-RcppExport SEXP _BayTetra_update_eta_kq_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP beta_kq0SEXP, SEXP xiSEXP, SEXP gamma_kqSEXP, SEXP nu_kqSEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP, SEXP g_cppSEXP, SEXP data_indexSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type xi(xiSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type gamma_kq(gamma_kqSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type nu_kq(nu_kqSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_eta_kq_cpp(alpha, beta, omega, theta_iq, sigma2, beta_kq0, xi, gamma_kq, nu_kq, y, Z, B, g_cpp, data_index));
-    return rcpp_result_gen;
-END_RCPP
-}
-// update_xi_kq_cpp
-arma::cube update_xi_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& beta_kq0, const arma::mat& eta, const arma::cube& m, const arma::vec& g_cpp, const arma::cube& data_index, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B);
-RcppExport SEXP _BayTetra_update_xi_kq_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP beta_kq0SEXP, SEXP etaSEXP, SEXP mSEXP, SEXP g_cppSEXP, SEXP data_indexSEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type m(mSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_xi_kq_cpp(alpha, beta, omega, theta_iq, sigma2, beta_kq0, eta, m, g_cpp, data_index, y, Z, B));
+    rcpp_result_gen = Rcpp::wrap(update_alpha_cpp(beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, B, Z, g_cpp, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha));
     return rcpp_result_gen;
 END_RCPP
 }
 // update_beta_kq0_cpp
-arma::mat update_beta_kq0_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& gamma_kq0, const arma::mat& nu_kq0, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g_cpp, const arma::cube& data_index);
-RcppExport SEXP _BayTetra_update_beta_kq0_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP gamma_kq0SEXP, SEXP nu_kq0SEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP, SEXP g_cppSEXP, SEXP data_indexSEXP) {
+arma::mat update_beta_kq0_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& nu_kq0, const arma::cube& y, const arma::cube& data_index, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp);
+RcppExport SEXP _BayTetra_update_beta_kq0_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP nu_kq0SEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -161,20 +115,42 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type gamma_kq0(gamma_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type nu_kq0(nu_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_beta_kq0_cpp(alpha, beta, omega, theta_iq, sigma2, gamma_kq0, nu_kq0, y, Z, B, g_cpp, data_index));
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_beta_kq0_cpp(alpha, beta, omega, theta_iq, sigma2, nu_kq0, y, data_index, B, Z, g_cpp));
+    return rcpp_result_gen;
+END_RCPP
+}
+// update_beta_kq_cpp
+arma::cube update_beta_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::cube& y, const arma::cube& data_index, const arma::mat& K_mat, const arma::mat& tau_kq2, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp);
+RcppExport SEXP _BayTetra_update_beta_kq_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP K_matSEXP, SEXP tau_kq2SEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type K_mat(K_matSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type tau_kq2(tau_kq2SEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
+    rcpp_result_gen = Rcpp::wrap(update_beta_kq_cpp(alpha, beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, K_mat, tau_kq2, B, Z, g_cpp));
     return rcpp_result_gen;
 END_RCPP
 }
 // logpost_omega_cpp
-double logpost_omega_cpp(int i, const arma::rowvec& omega_i, const arma::mat& alpha, const arma::cube& beta, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g, const arma::cube& data_index, int K, int Q, int J_max);
-RcppExport SEXP _BayTetra_logpost_omega_cpp(SEXP iSEXP, SEXP omega_iSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP Sigma_omegaSEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP, SEXP gSEXP, SEXP data_indexSEXP, SEXP KSEXP, SEXP QSEXP, SEXP J_maxSEXP) {
+double logpost_omega_cpp(int i, const arma::rowvec& omega_i, const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega, const arma::cube& y, const arma::cube& data_index, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp, int K, int Q, int J_max);
+RcppExport SEXP _BayTetra_logpost_omega_cpp(SEXP iSEXP, SEXP omega_iSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP Sigma_omegaSEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP, SEXP KSEXP, SEXP QSEXP, SEXP J_maxSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -182,40 +158,42 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< const arma::rowvec& >::type omega_i(omega_iSEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type Sigma_omega(Sigma_omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< int >::type K(KSEXP);
     Rcpp::traits::input_parameter< int >::type Q(QSEXP);
     Rcpp::traits::input_parameter< int >::type J_max(J_maxSEXP);
-    rcpp_result_gen = Rcpp::wrap(logpost_omega_cpp(i, omega_i, alpha, beta, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, K, Q, J_max));
+    rcpp_result_gen = Rcpp::wrap(logpost_omega_cpp(i, omega_i, alpha, beta, beta_kq0, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, K, Q, J_max));
     return rcpp_result_gen;
 END_RCPP
 }
 // update_omega_cpp
-arma::mat update_omega_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g, const arma::cube& data_index, const double omega_var_update);
-RcppExport SEXP _BayTetra_update_omega_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP Sigma_omegaSEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP, SEXP gSEXP, SEXP data_indexSEXP, SEXP omega_var_updateSEXP) {
+arma::mat update_omega_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega, const arma::cube& y, const arma::cube& data_index, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp, const double omega_var_update);
+RcppExport SEXP _BayTetra_update_omega_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP sigma2SEXP, SEXP Sigma_omegaSEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP, SEXP omega_var_updateSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type Sigma_omega(Sigma_omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< const double >::type omega_var_update(omega_var_updateSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_omega_cpp(alpha, beta, omega, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, omega_var_update));
+    rcpp_result_gen = Rcpp::wrap(update_omega_cpp(alpha, beta, beta_kq0, omega, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, omega_var_update));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -245,24 +223,26 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_theta_iq_cpp
-arma::cube update_theta_iq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::vec& sigma2, const arma::cube& data_index, const arma::cube& y, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g, const arma::cube& t, const arma::vec& tau_q_vec, const arma::vec& lambda_q_vec);
-RcppExport SEXP _BayTetra_update_theta_iq_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP sigma2SEXP, SEXP data_indexSEXP, SEXP ySEXP, SEXP BSEXP, SEXP ZSEXP, SEXP gSEXP, SEXP tSEXP, SEXP tau_q_vecSEXP, SEXP lambda_q_vecSEXP) {
+arma::cube update_theta_iq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, const arma::mat& omega, const arma::vec& sigma2, const arma::cube& y, const arma::cube& data_index, const arma::cube& t_std, const arma::cube& t_org, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp, const arma::vec& tau_q_vec, const arma::vec& lambda_q_vec);
+RcppExport SEXP _BayTetra_update_theta_iq_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP omegaSEXP, SEXP sigma2SEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP t_stdSEXP, SEXP t_orgSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP, SEXP tau_q_vecSEXP, SEXP lambda_q_vecSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
     Rcpp::traits::input_parameter< const arma::mat& >::type omega(omegaSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type sigma2(sigma2SEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type t_std(t_stdSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type t_org(t_orgSEXP);
     Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
     Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
-    Rcpp::traits::input_parameter< const arma::cube& >::type t(tSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type tau_q_vec(tau_q_vecSEXP);
     Rcpp::traits::input_parameter< const arma::vec& >::type lambda_q_vec(lambda_q_vecSEXP);
-    rcpp_result_gen = Rcpp::wrap(update_theta_iq_cpp(alpha, beta, omega, sigma2, data_index, y, B, Z, g, t, tau_q_vec, lambda_q_vec));
+    rcpp_result_gen = Rcpp::wrap(update_theta_iq_cpp(alpha, beta, beta_kq0, omega, sigma2, y, data_index, t_std, t_org, B, Z, g_cpp, tau_q_vec, lambda_q_vec));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -335,23 +315,24 @@ BEGIN_RCPP
 END_RCPP
 }
 // update_sigma2_cpp
-arma::vec update_sigma2_cpp(arma::mat& alpha, arma::cube& beta, arma::mat& omega, const arma::cube& theta_iq, const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::cube& data_index, const arma::vec& g, double h_1, double h_2);
-RcppExport SEXP _BayTetra_update_sigma2_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP ySEXP, SEXP ZSEXP, SEXP BSEXP, SEXP data_indexSEXP, SEXP gSEXP, SEXP h_1SEXP, SEXP h_2SEXP) {
+arma::vec update_sigma2_cpp(arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, arma::mat& omega, const arma::cube& theta_iq, const arma::cube& y, const arma::cube& data_index, const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp, double h_1, double h_2);
+RcppExport SEXP _BayTetra_update_sigma2_cpp(SEXP alphaSEXP, SEXP betaSEXP, SEXP beta_kq0SEXP, SEXP omegaSEXP, SEXP theta_iqSEXP, SEXP ySEXP, SEXP data_indexSEXP, SEXP BSEXP, SEXP ZSEXP, SEXP g_cppSEXP, SEXP h_1SEXP, SEXP h_2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< arma::mat& >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::cube& >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type beta_kq0(beta_kq0SEXP);
     Rcpp::traits::input_parameter< arma::mat& >::type omega(omegaSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type theta_iq(theta_iqSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
-    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
     Rcpp::traits::input_parameter< const arma::cube& >::type data_index(data_indexSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type g(gSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type B(BSEXP);
+    Rcpp::traits::input_parameter< const arma::field<arma::cube>& >::type Z(ZSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type g_cpp(g_cppSEXP);
     Rcpp::traits::input_parameter< double >::type h_1(h_1SEXP);
     Rcpp::traits::input_parameter< double >::type h_2(h_2SEXP);
-    rcpp_result_gen = Rcpp::wrap(update_sigma2_cpp(alpha, beta, omega, theta_iq, y, Z, B, data_index, g, h_1, h_2));
+    rcpp_result_gen = Rcpp::wrap(update_sigma2_cpp(alpha, beta, beta_kq0, omega, theta_iq, y, data_index, B, Z, g_cpp, h_1, h_2));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -464,20 +445,19 @@ static const R_CallMethodDef CallEntries[] = {
     {"_BayTetra_rmvn_rcpp", (DL_FUNC) &_BayTetra_rmvn_rcpp, 3},
     {"_BayTetra_rinvgamma_rcpp", (DL_FUNC) &_BayTetra_rinvgamma_rcpp, 2},
     {"_BayTetra_dinv_gamma_rcpp", (DL_FUNC) &_BayTetra_dinv_gamma_rcpp, 4},
-    {"_BayTetra_update_alpha_cpp", (DL_FUNC) &_BayTetra_update_alpha_cpp, 12},
-    {"_BayTetra_update_eta_kq_cpp", (DL_FUNC) &_BayTetra_update_eta_kq_cpp, 14},
-    {"_BayTetra_update_xi_kq_cpp", (DL_FUNC) &_BayTetra_update_xi_kq_cpp, 13},
-    {"_BayTetra_update_beta_kq0_cpp", (DL_FUNC) &_BayTetra_update_beta_kq0_cpp, 12},
-    {"_BayTetra_logpost_omega_cpp", (DL_FUNC) &_BayTetra_logpost_omega_cpp, 15},
-    {"_BayTetra_update_omega_cpp", (DL_FUNC) &_BayTetra_update_omega_cpp, 12},
+    {"_BayTetra_update_alpha_cpp", (DL_FUNC) &_BayTetra_update_alpha_cpp, 13},
+    {"_BayTetra_update_beta_kq0_cpp", (DL_FUNC) &_BayTetra_update_beta_kq0_cpp, 11},
+    {"_BayTetra_update_beta_kq_cpp", (DL_FUNC) &_BayTetra_update_beta_kq_cpp, 13},
+    {"_BayTetra_logpost_omega_cpp", (DL_FUNC) &_BayTetra_logpost_omega_cpp, 16},
+    {"_BayTetra_update_omega_cpp", (DL_FUNC) &_BayTetra_update_omega_cpp, 13},
     {"_BayTetra_logpost_Sigma_omega_cpp", (DL_FUNC) &_BayTetra_logpost_Sigma_omega_cpp, 2},
     {"_BayTetra_update_Sigma_omega_cpp", (DL_FUNC) &_BayTetra_update_Sigma_omega_cpp, 3},
-    {"_BayTetra_update_theta_iq_cpp", (DL_FUNC) &_BayTetra_update_theta_iq_cpp, 12},
+    {"_BayTetra_update_theta_iq_cpp", (DL_FUNC) &_BayTetra_update_theta_iq_cpp, 14},
     {"_BayTetra_update_tau_q_cpp", (DL_FUNC) &_BayTetra_update_tau_q_cpp, 6},
     {"_BayTetra_logpost_lambda_normpart_cpp", (DL_FUNC) &_BayTetra_logpost_lambda_normpart_cpp, 6},
     {"_BayTetra_update_lambda_q_cpp", (DL_FUNC) &_BayTetra_update_lambda_q_cpp, 8},
     {"_BayTetra_update_lambda_q_cpp_wth_accept", (DL_FUNC) &_BayTetra_update_lambda_q_cpp_wth_accept, 8},
-    {"_BayTetra_update_sigma2_cpp", (DL_FUNC) &_BayTetra_update_sigma2_cpp, 11},
+    {"_BayTetra_update_sigma2_cpp", (DL_FUNC) &_BayTetra_update_sigma2_cpp, 12},
     {"_BayTetra_update_alpha_Q1_cpp", (DL_FUNC) &_BayTetra_update_alpha_Q1_cpp, 10},
     {"_BayTetra_update_eta_kq_Q1_cpp", (DL_FUNC) &_BayTetra_update_eta_kq_Q1_cpp, 12},
     {"_BayTetra_update_xi_kq_Q1_cpp", (DL_FUNC) &_BayTetra_update_xi_kq_Q1_cpp, 11},

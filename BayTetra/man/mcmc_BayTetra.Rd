@@ -39,11 +39,10 @@ the number of interior knots. Default value is 4 and minimum value is 3.
 \itemize{
 \item \code{mu_alpha}: The mean in normal prior for \eqn{\alpha_{q}}. Default value is a zero vector.
 \item \code{V_alpha}: The covariance matrix in normal prior for \eqn{\alpha_{q}}. Default value is 100 * \eqn{I} where \eqn{I} is the identity matrix.
-\item \code{nu_0}: The hyperparameter \eqn{\nu_0} in prior for \eqn{\gamma_{kq}} and \eqn{\gamma_{kq0}}. Default value is 2.5e-5.
-\item \code{a_nu}: The hyperparameter \eqn{a_{\nu}} in prior for \eqn{\nu_{kq}} and \eqn{\nu_{kq0}}. Default value is 5.
-\item \code{b_nu}: The hyperparameter \eqn{b_{\nu}} in prior for \eqn{\nu_{kq}} and \eqn{\nu_{kq0}}. Default value is 25.
-\item \code{a_rho}: The hyperparameter \eqn{a_{\rho}} in prior for \eqn{\rho_0}. Default value is 1.
-\item \code{b_rho}: The hyperparameter \eqn{b_{\rho}} in prior for \eqn{\rho_0}. Default value is 1.
+\item \code{a_nu}: The hyperparameter \eqn{a_{\nu}} in prior for \eqn{\nu_{kq0}^2}. Default value is 1.
+\item \code{b_nu}: The hyperparameter \eqn{b_{\nu}} in prior for \eqn{\nu_{kq0}^2}. Default value is 1.
+\item \code{a_eta}: The hyperparameter \eqn{a_{\eta}} in prior for \eqn{\tau_{kq}^2}. Default value is 1.
+\item \code{b_eta}: The hyperparameter \eqn{b_{\eta}} in prior for \eqn{\tau_{kq}^2}. Default value is 1.
 \item \code{a_tau}: The hyperparameter \eqn{a_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
 \item \code{b_tau}: The hyperparameter \eqn{b_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
 \item \code{a_lamb}: The hyperparameter \eqn{a_{\lambda}} in prior for \eqn{\lambda_q}. Default value is 1.
@@ -65,9 +64,8 @@ the number of interior knots. Default value is 4 and minimum value is 3.
 An object of class 'Post_BayTetra' containing posterior samples:
 \itemize{
 \item \code{pos.alpha}: Posterior samples for \eqn{\alpha_{q}}.
-\item \code{pos.beta}: Posterior samples for \eqn{\widetilde{\boldsymbol{\beta}}_{k q}}.
-\item \code{pos.gamma_kq}: Posterior samples for \eqn{\gamma_{kq}}.
-\item \code{pos.gamma_kq0}: Posterior samples for \eqn{\gamma_{kq0}}.
+\item \code{pos.beta}: Posterior samples for \eqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-}}.
+\item \code{pos.beta_kq0}: Posterior samples for \eqn{\beta_{kq0}}.
 \item \code{pos.Sigma_omega}: Posterior samples for \eqn{\Sigma_{\omega}}.
 \item \code{pos.tau_q}: Posterior samples for \eqn{\tau^2_q}.
 \item \code{pos.lambda_q}: Posterior samples for \eqn{\lambda^2_q}.
@@ -92,16 +90,13 @@ We set \eqn{\widetilde{\beta}_{K q 0}} to 0 for identifiability and denote
 \eqn{\widetilde{\boldsymbol{\beta}}_{k q}=\left(\widetilde{\beta}_{k q 0}, \widetilde{\beta}_{k q 1}, \ldots, \widetilde{\beta}_{k q, L-1}\right)^{\mathrm{T}}=\left(\widetilde{\beta}_{k q 0},\left(\widetilde{ \boldsymbol{\beta } }_{k q}^{-}\right)^{\mathrm{T}}\right)^{\mathrm{T}} .}
 
 We assign priors:
-\deqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-}=\eta_{k q} \boldsymbol{\xi}_{k q},}
-\deqn{\eta_{k q} \sim \mathcal{N}\left(0, \gamma_{k q} \nu_{k q}\right),}
-\deqn{\gamma_{k q} \sim \rho \delta_1\left(\gamma_{k q}\right)+(1-\rho) \delta_{\nu_0}\left(\gamma_{k q}\right),}
-\deqn{\nu_{k q} \sim \operatorname{Inverse-Gamma}\left(a_\nu, b_\nu\right),}
-\deqn{\rho \sim \text{Beta}(a_{\rho},b_{\rho}), \xi_{kql} \sim \mathcal{N}(m_{kql}, 1),}
-\deqn{m_{kql} \sim \frac{1}{2}\delta_1(m_{kql}) + \frac{1}{2}\delta_{-1}(m_{kql}), l=1,2,\dots,L-1.}
+\deqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-} \mid \eta_{kq}^2 \propto \exp \left\{-\frac{1}{2 \eta_{kq}^2} (\widetilde{\boldsymbol{\beta}}_{k q}^{-})^{\mathrm{T}} \bm{P}_{kq}  \widetilde{\boldsymbol{\beta}}_{k q}^{-} \right\},}
+\deqn{\eta_{kq}^2 \sim \text{Gamma}(a_{\eta},b_{\eta}),}
+where \eqn{P_{kq}} is a singular penalty matrix constructed from the second-order differences of the adjacent B-spline coefficients.
 
 For the intercept \eqn{\widetilde{\beta}_{k q 0}}, we assume its prior:
-\deqn{\widetilde{\beta}_{k q 0} \sim \mathcal{N}\left(0, \gamma_{k q 0} \nu_{k q 0}\right),}
-\deqn{\gamma_{k q 0} \sim \rho_0 \delta_1\left(\gamma_{k q 0}\right)+\left(1-\rho_0\right) \delta_{\nu_0}\left(\gamma_{k q 0}\right).}
+\deqn{\widetilde{\beta}_{k q 0} \sim \mathcal{N}\left(0, \nu_{k q 0}^2 \right),}
+\deqn{\nu_{kq0}^2 \sim \text { Inverse-Gamma }\left(a_\nu, b_\nu\right).}
 
 The prior of other parameters are:
 \deqn{\boldsymbol{\alpha}_q \sim \mathcal{N}\left(0, \Sigma_\alpha\right), p\left(\Sigma_\omega\right) \propto 1 ,}
@@ -116,7 +111,7 @@ mcmc_result = mcmc_BayTetra(data = ex_data,
                             v_covs = "cov1",
                             v_grp = "Group",
                             v_time = "time",
-                            df = 5)
+                            df = 10)
 }
 
 

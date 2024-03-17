@@ -1,0 +1,32 @@
+Package: BayTetra
+Title: BayTetra: A Bayesian Semiparametric Approach for Testing
+        Trajectory Differences
+Version: 0.1.0
+Author: Wei Jin, Qiuxin Gao, Yanxun Xu <yanxun.xu@jhu.edu>
+Maintainer: Qiuxin Gao <qgao13@jh.edu>
+Description: BayTetra addresses an important task in the field of biomedical 
+    applications, testing differences in longitudinal trajectories among distinct 
+    groups of populations. The package offers a Bayesian semiparametric approach 
+    for modeling multivariate longitudinal data. It accounts for correlations 
+    among different responses and employs B-splines, along with penalties on 
+    smoothness of the spline coefficients, for flexible and parsimonious trajectory 
+    estimation. The package is inspired by the research paper "BayTetra — A Bayesian 
+    Semiparametric Approach for Testing Trajectory Differences" by Jin, W & Gao, Q & 
+    Xu, Y (2023).
+License: GPL-3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+LinkingTo: Rcpp(>= 1.0.5),RcppArmadillo(>= 0.12.2.0.0)
+Imports: MCMCpack(>= 1.6-3),MASS(>= 7.3-58.4),Rcpp(>=
+        1.0.10),splines(>= 4.3.0), dplyr(>= 1.1.2),tmvtnorm(>=
+        1.5),Matrix(>= 1.5-4),rstan(>= 2.20.0), mvtnorm(>=
+        1.1-1),truncnorm(>= 1.0-8),pracma(>= 2.3.3),loo(>=
+        2.6.0),GIGrvg(>= 0.8)
+Depends: R (>= 4.2)
+SystemRequirements: GNU make
+NeedsCompilation: yes
+LazyData: true
+URL: https://github.com/SteveGaoQX/BayTetra
+BugReports: https://github.com/SteveGaoQX/BayTetra/issues
+Packaged: 2024-03-17 11:34:59 UTC; r2082051

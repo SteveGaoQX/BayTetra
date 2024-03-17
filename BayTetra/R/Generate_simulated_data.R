@@ -73,7 +73,7 @@ Generate_simulated_data <- function() {
   }
   K <- 3 # number of subject classes
   g <- rep(1:K, length.out = I)
-  df = 4
+  df = 9
   # Here g should follow the index by Rcpp start from 0
   num_intervals <- df - 3 + 1
   # Calculate the quantiles
@@ -84,9 +84,8 @@ Generate_simulated_data <- function() {
   spline_basis <- bs(seq(t_min, t_max, length.out=1000), knots = middle_quantiles, intercept = TRUE)
 
 
-  # print(dim(spline_basis))
   L <- dim(spline_basis)[2]  # degree of freedoms for spline expansion with intercept
-  B <- array(NA, dim=c(I, Q, J_max, L)) # time spline basis matrix
+  B <- array(NA, dim=c(I, Q, J_max, L)) # time spline basis matrix 
   for (i in 1:I){
     for (q in 1:Q){
       data_index_iq <- which(data_index[i,q,] == 1) # index of data for i-th subject at q-th response
@@ -97,10 +96,12 @@ Generate_simulated_data <- function() {
   Z_qr_all = list()
   # Initialize B_after_qr_allq
   B_after_qr_allq <- array(NA, dim=c(I, Q, J_max, L-1))
+  
   for (q in 1:Q){
     B_q <- NULL
     record_counter <- 1
     record_rows <- list()
+    
     for(i in 1:I){
       data_index_iq <- which(data_index[i, q,] == 1) # Indices of data for i-th subject at q-th response
       B_iq <- B[i,q,data_index_iq,] # Extract data for current i and q
@@ -114,17 +115,21 @@ Generate_simulated_data <- function() {
         record_rows[[i]] <- c(NA, NA)
       }
     }
+    
     # Compute B_q^T %*% 1
     trans1 <- t(B_q) %*% rep(1, nrow(B_q))
+    
     # Perform Householder QR decomposition
     QR <- householder(trans1)
     Q_matrix <- QR$Q
     R_matrix <- QR$R
+    
     # Form Z_qr from 2 to L columns of Q
     Z_qr <- Q_matrix[, -1]
     Z_qr_all[[q]] = Z_qr
     # Compute B_after_qr
     B_after_qr <- B_q %*% Z_qr
+    
     # For each i, assign corresponding rows to B_after_qr_complete
     for(i in 1:I){
       #B_after_qr_complete <- array(NA, dim=c(n, J_max, L-1))
@@ -136,18 +141,14 @@ Generate_simulated_data <- function() {
       }
     }
   }
-  B_new = array(NA, dim=c(I, Q, J_max, L))
-  for (i in 1:I){
-    for (q in 1:Q){
-      data_index_iq <- which(data_index[i,q,] == 1) # index of data for i-th subject at q-th response
-      if (length(data_index_iq) == 1) {
-        B_new[i,q,data_index_iq,] = c(1, B_after_qr_allq[i,q, data_index_iq , ])
-      } else {
-        B_new[i,q,data_index_iq,] = cbind(rep(1,length(data_index_iq)), B_after_qr_allq[i,q, data_index_iq , ])
-      }
-    }
-  }
-  B = B_new
+  
+  
+  B = B_after_qr_allq
+  L = dim(B)[4]
+  
+  P_beta <- makeP(dim=L, degree=2) 
+  
+  
   omega <- matrix(NA, nrow=I, ncol=Q) # response correlation terms
   Sigma_omega <- diag(1, Q) # correlation matrix
   Sigma_omega[1,2] <- Sigma_omega[2,1] <- 0.75
@@ -173,20 +174,25 @@ Generate_simulated_data <- function() {
       theta_iq[i,q, data_index_iq] = theta_cur_iq;
     }
   }
-  sigma2 <- rep(1, Q) # variance of i.i.d Gaussian error
+  
+  sigma2 <- rep(0.5, Q) # variance of i.i.d Gaussian error
   beta <- array(NA, dim=c(K, Q, L))
-  beta[1,1, ] = c(-3.56,-2.20,-1.41,2.77,-2.57)
-  beta[1,2, ] = c(-1.49,-2.27,3.68,-1.36,3.05)
+  beta[1,1, ] = c(-0.07142442,-0.9023911,-1.6142174,-1.1723674,0.2139180,
+                  1.19694463,0.6818716,-1.050855,-2.055200)
+  beta[1,2, ] = c(-1.35287953,-1.4701541,-0.6735524,0.8495789,0.9193538,
+                  0.03852217,0.6572662,1.492269,2.560624)
   beta[2,1, ] = 0
   beta[2,2, ] = 0
-  beta[3,1, ] = c(0,3.73,3.77,-1.17,3.84)
-  beta[3,2, ] = c(0,2.00,3.93,-1.75,-1.99)
+  beta[3,1, ] = c(-1.8003245,0.8970589,2.951867,3.166909,1.819671,
+                  0.36735707,0.7319628,2.219103,3.484856)
+  beta[3,2, ] = c(-0.3446178,1.0306363,2.302487,2.572165,1.649515,
+                  0.05354716,-1.5059283,-1.963917,-2.155285)
   #
   alpha <- array(NA, dim=c(Q,S))
   alpha[,1] = c(2.36,2.74)
   alpha[,2] = c(2.12,2.13)
   # beta_truth = beta
-  # alpha_truth = alpha
+  # alpha_truth = alpha 
   # Generate the y: simulated data
   y <- array(NA, dim = c(I, Q, J_max))  # Initialize y with same dimensions as t
   for (i in 1:I) {

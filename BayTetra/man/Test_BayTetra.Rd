@@ -14,7 +14,7 @@ Test_BayTetra(object, v_rsp)
 \value{
 Return an object of class "Test_BayTetra" containing three elements:
 \itemize{
-\item{BayTetra_summary}: {A dataframe that summarizes the testing information for \eqn{\widetilde{\beta}_{k q 0}} and \eqn{\widetilde{ \boldsymbol{\beta } }_{k q}^{-}}. The 'Pr(Signal)' column represents the confidence level \eqn{P(\gamma_{kq} = 1)}.}
+\item{BayTetra_summary}: {A dataframe that summarizes the testing information for \eqn{\widetilde{\beta}_{k q 0}} and \eqn{\widetilde{ \boldsymbol{\beta } }_{k q}^{-}}. }
 \item{pairwise_significance}: {A matrix indicating pairwise hypothesis testing
 results. For each pair of groups, their longitudinal trajectories are significantly
 different if the corresponding responses present in the table.}
@@ -31,7 +31,7 @@ mcmc_result = mcmc_BayTetra(data = ex_data,
                             v_covs = "cov1",
                             v_grp = "Group",
                             v_time = "time",
-                            df = 5)
+                            df = 10)
 test_result <- Test_BayTetra(mcmc_result,
                            v_rsp = paste("R", 1:2,sep = ""))
 }

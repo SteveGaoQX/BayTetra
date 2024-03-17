@@ -2,7 +2,38 @@
 #'
 #' Draw posterior samples of the parameters of interest from BayTetra
 #'
-#'
+#' @param data longitudinal data with ID, VISIT, Group, and Covariates, Responses, Time.
+#' @param v_rsp Column names corresponding to responses.
+#' @param v_covs Column names corresponding to covariates.
+#' @param v_grp Column name corresponding to group memberships.
+#' @param v_time Column name corresponding to time.
+#' @param df This parameter specifies the degree of freedom of B-spline and is used to select
+#' the number of interior knots. Default value is 4 and minimum value is 3.
+#' \itemize{
+#'   \item {df = 3: Function uses a degree 2 B-spline with 0 interior knots.}
+#'   \item {df = 4: Function uses a degree 3 B-spline with 0 interior knots.}
+#'   \item {df >= 5: Function uses a degree 3 B-spline with (df - 4) interior knots.}
+#' }
+#' @param prior A list giving the prior information.
+#'  - \code{mu_alpha}: The mean in normal prior for \eqn{\alpha_{q}}. Default value is a zero vector.
+#'  - \code{V_alpha}: The covariance matrix in normal prior for \eqn{\alpha_{q}}. Default value is 100 * \eqn{I} where \eqn{I} is the identity matrix.
+#'  - \code{a_nu}: The hyperparameter \eqn{a_{\nu}} in prior for \eqn{\nu_{kq0}^2}. Default value is 1.
+#'  - \code{b_nu}: The hyperparameter \eqn{b_{\nu}} in prior for \eqn{\nu_{kq0}^2}. Default value is 1.
+#'  - \code{a_eta}: The hyperparameter \eqn{a_{\eta}} in prior for \eqn{\tau_{kq}^2}. Default value is 1.
+#'  - \code{b_eta}: The hyperparameter \eqn{b_{\eta}} in prior for \eqn{\tau_{kq}^2}. Default value is 1.
+#'  - \code{a_tau}: The hyperparameter \eqn{a_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
+#'  - \code{b_tau}: The hyperparameter \eqn{b_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
+#'  - \code{a_lamb}: The hyperparameter \eqn{a_{\lambda}} in prior for \eqn{\lambda_q}. Default value is 1.
+#'  - \code{b_lamb}: The hyperparameter \eqn{b_{\lambda}} in prior for \eqn{\lambda_q}. Default value is 1.
+#'  - \code{h_1}: The hyperparameter \eqn{a_{\sigma}} in prior for \eqn{\sigma_q^2}. Default value is 1.
+#'  - \code{h_2}: The hyperparameter \eqn{b_{\sigma}} in prior for \eqn{\sigma_q^2}. Default value is 1.
+#' @param mcmc A list giving the MCMC parameters.
+#'  - \code{Nit}: The number of iterations for the MCMC chain. Default is 4000.
+#'  - \code{burn_in}: The number of burn-in samples in the MCMC chain. Default is 2000.
+#'  - \code{thin_factor}: The thinning factor for the chain. Default is 10.
+#' @param display_process A bool value; if TRUE, progress will be displayed every 1000 iteration by default.
+#' 
+#' 
 #'
 #' @details
 #' The model of the BayTetra is:
@@ -22,17 +53,16 @@
 #' \eqn{\widetilde{\boldsymbol{\beta}}_{k q}=\left(\widetilde{\beta}_{k q 0}, \widetilde{\beta}_{k q 1}, \ldots, \widetilde{\beta}_{k q, L-1}\right)^{\mathrm{T}}=\left(\widetilde{\beta}_{k q 0},\left(\widetilde{ \boldsymbol{\beta } }_{k q}^{-}\right)^{\mathrm{T}}\right)^{\mathrm{T}} .}
 #'
 #' We assign priors:
-#' \deqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-}=\eta_{k q} \boldsymbol{\xi}_{k q},}
-#' \deqn{\eta_{k q} \sim \mathcal{N}\left(0, \gamma_{k q} \nu_{k q}\right),}
-#' \deqn{\gamma_{k q} \sim \rho \delta_1\left(\gamma_{k q}\right)+(1-\rho) \delta_{\nu_0}\left(\gamma_{k q}\right),}
-#' \deqn{\nu_{k q} \sim \operatorname{Inverse-Gamma}\left(a_\nu, b_\nu\right),}
-#' \deqn{\rho \sim \text{Beta}(a_{\rho},b_{\rho}), \xi_{kql} \sim \mathcal{N}(m_{kql}, 1),}
-#' \deqn{m_{kql} \sim \frac{1}{2}\delta_1(m_{kql}) + \frac{1}{2}\delta_{-1}(m_{kql}), l=1,2,\dots,L-1.}
+#' \deqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-} \mid \eta_{kq}^2 \propto \exp \left\{-\frac{1}{2 \eta_{kq}^2} (\widetilde{\boldsymbol{\beta}}_{k q}^{-})^{\mathrm{T}} \bm{P}_{kq}  \widetilde{\boldsymbol{\beta}}_{k q}^{-} \right\},}
+#' \deqn{\eta_{kq}^2 \sim \text{Gamma}(a_{\eta},b_{\eta}),}
+#' where \eqn{P_{kq}} is a singular penalty matrix constructed from the second-order differences of the adjacent B-spline coefficients.
+#' 
+#' 
 #'
 #'
 #' For the intercept \eqn{\widetilde{\beta}_{k q 0}}, we assume its prior:
-#' \deqn{\widetilde{\beta}_{k q 0} \sim \mathcal{N}\left(0, \gamma_{k q 0} \nu_{k q 0}\right),}
-#' \deqn{\gamma_{k q 0} \sim \rho_0 \delta_1\left(\gamma_{k q 0}\right)+\left(1-\rho_0\right) \delta_{\nu_0}\left(\gamma_{k q 0}\right).}
+#' \deqn{\widetilde{\beta}_{k q 0} \sim \mathcal{N}\left(0, \nu_{k q 0}^2 \right),}
+#' \deqn{\nu_{kq0}^2 \sim \text { Inverse-Gamma }\left(a_\nu, b_\nu\right).}
 #'
 #'
 #' The prior of other parameters are:
@@ -43,44 +73,12 @@
 #'
 #'
 #'
-#' @param data longitudinal data with ID, VISIT, Group, and Covariates, Responses, Time.
-#' @param v_rsp Column names corresponding to responses.
-#' @param v_covs Column names corresponding to covariates.
-#' @param v_grp Column name corresponding to group memberships.
-#' @param v_time Column name corresponding to time.
-#' @param df This parameter specifies the degree of freedom of B-spline and is used to select
-#' the number of interior knots. Default value is 4 and minimum value is 3.
-#' \itemize{
-#'   \item {df = 3: Function uses a degree 2 B-spline with 0 interior knots.}
-#'   \item {df = 4: Function uses a degree 3 B-spline with 0 interior knots.}
-#'   \item {df >= 5: Function uses a degree 3 B-spline with (df - 4) interior knots.}
-#' }
-#' @param prior A list giving the prior information.
-#'  - \code{mu_alpha}: The mean in normal prior for \eqn{\alpha_{q}}. Default value is a zero vector.
-#'  - \code{V_alpha}: The covariance matrix in normal prior for \eqn{\alpha_{q}}. Default value is 100 * \eqn{I} where \eqn{I} is the identity matrix.
-#'  - \code{nu_0}: The hyperparameter \eqn{\nu_0} in prior for \eqn{\gamma_{kq}} and \eqn{\gamma_{kq0}}. Default value is 2.5e-5.
-#'  - \code{a_nu}: The hyperparameter \eqn{a_{\nu}} in prior for \eqn{\nu_{kq}} and \eqn{\nu_{kq0}}. Default value is 5.
-#'  - \code{b_nu}: The hyperparameter \eqn{b_{\nu}} in prior for \eqn{\nu_{kq}} and \eqn{\nu_{kq0}}. Default value is 25.
-#'  - \code{a_rho}: The hyperparameter \eqn{a_{\rho}} in prior for \eqn{\rho_0}. Default value is 1.
-#'  - \code{b_rho}: The hyperparameter \eqn{b_{\rho}} in prior for \eqn{\rho_0}. Default value is 1.
-#'  - \code{a_tau}: The hyperparameter \eqn{a_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
-#'  - \code{b_tau}: The hyperparameter \eqn{b_{\tau}} in prior for \eqn{\tau_q^2}. Default value is 1.
-#'  - \code{a_lamb}: The hyperparameter \eqn{a_{\lambda}} in prior for \eqn{\lambda_q}. Default value is 1.
-#'  - \code{b_lamb}: The hyperparameter \eqn{b_{\lambda}} in prior for \eqn{\lambda_q}. Default value is 1.
-#'  - \code{h_1}: The hyperparameter \eqn{a_{\sigma}} in prior for \eqn{\sigma_q^2}. Default value is 1.
-#'  - \code{h_2}: The hyperparameter \eqn{b_{\sigma}} in prior for \eqn{\sigma_q^2}. Default value is 1.
-#' @param mcmc A list giving the MCMC parameters.
-#'  - \code{Nit}: The number of iterations for the MCMC chain. Default is 4000.
-#'  - \code{burn_in}: The number of burn-in samples in the MCMC chain. Default is 2000.
-#'  - \code{thin_factor}: The thinning factor for the chain. Default is 10.
-#' @param display_process A bool value; if TRUE, progress will be displayed every 1000 iteration by default.
 #'
 #' @return An object of class 'Post_BayTetra' containing posterior samples:
 #'   \itemize{
 #'     \item \code{pos.alpha}: Posterior samples for \eqn{\alpha_{q}}.
-#'     \item \code{pos.beta}: Posterior samples for \eqn{\widetilde{\boldsymbol{\beta}}_{k q}}.
-#'     \item \code{pos.gamma_kq}: Posterior samples for \eqn{\gamma_{kq}}.
-#'     \item \code{pos.gamma_kq0}: Posterior samples for \eqn{\gamma_{kq0}}.
+#'     \item \code{pos.beta}: Posterior samples for \eqn{\widetilde{\boldsymbol{\beta}}_{k q}^{-}}.
+#'     \item \code{pos.beta_kq0}: Posterior samples for \eqn{\beta_{kq0}}.
 #'     \item \code{pos.Sigma_omega}: Posterior samples for \eqn{\Sigma_{\omega}}.
 #'     \item \code{pos.tau_q}: Posterior samples for \eqn{\tau^2_q}.
 #'     \item \code{pos.lambda_q}: Posterior samples for \eqn{\lambda^2_q}.
@@ -95,7 +93,7 @@
 #'                             v_covs = "cov1",
 #'                             v_grp = "Group",
 #'                             v_time = "time",
-#'                             df = 5)
+#'                             df = 10)
 #' }
 #'
 #'
@@ -107,6 +105,7 @@
 #' @importFrom pracma householder
 #' @importFrom stats predict quantile rbeta rgamma rnorm
 #' @importFrom utils modifyList
+#' @importFrom GIGrvg rgig
 
 #' @export
 
@@ -256,11 +255,10 @@ mcmc_BayTetra <- function(data,
   default_hyper_params <- list(
     mu_alpha = rep(0, S),
     V_alpha = diag(100, S),
-    nu_0 = 2.5e-5,
-    a_nu = 5,
-    b_nu = 25,
-    a_rho = 1,
-    b_rho = 1,
+    a_nu = 1,
+    b_nu = 1,
+    a_eta = 1,
+    b_eta = 1,
     a_lamb = 1,
     b_lamb = 1,
     a_tau = 1,
@@ -275,11 +273,10 @@ mcmc_BayTetra <- function(data,
   # Extract variables for use
   mu_alpha <- final_hyper_params$mu_alpha
   V_alpha <- final_hyper_params$V_alpha
-  nu_0 <- final_hyper_params$nu_0
   a_nu <- final_hyper_params$a_nu
   b_nu <- final_hyper_params$b_nu
-  a_rho <- final_hyper_params$a_rho
-  b_rho <- final_hyper_params$b_rho
+  a_eta <- final_hyper_params$a_eta
+  b_eta <- final_hyper_params$b_eta
   a_lamb <- final_hyper_params$a_lamb
   b_lamb <- final_hyper_params$b_lamb
   a_tau <- final_hyper_params$a_tau
@@ -372,18 +369,14 @@ mcmc_BayTetra <- function(data,
       }
     }
   }
-  B_new = array(NA, dim=c(I, Q, J_max, L))
-  for (i in 1:I){
-    for (q in 1:Q){
-      data_index_iq <- which(data_index[i,q,] == 1) # index of data for i-th subject at q-th response
-      if (length(data_index_iq) == 1) {
-        B_new[i,q,data_index_iq,] = c(1, B_after_qr_allq[i,q, data_index_iq , ])
-      } else {
-        B_new[i,q,data_index_iq,] = cbind(rep(1,length(data_index_iq)), B_after_qr_allq[i,q, data_index_iq , ])
-      }
-    }
-  }
-  B = B_new
+  
+  B = B_after_qr_allq
+  L = dim(B)[4]
+  
+  # print(paste("L = ",L))
+  # stop(print("end"))
+  
+  K_mat <- makeP(dim=L, degree=2) 
 
 
   if(Q > 1){
@@ -429,135 +422,110 @@ mcmc_BayTetra <- function(data,
     # Initialize MCMC storage object
     mcmc <- list()
 
-    # Initialize alpha, beta, omega, Sigma_omega, sigma2
     mcmc$alpha <- array(NA, dim=c(Nit, Q, S))
-    # mcmc$omega <- array(NA, dim=c(I, Q))
-    mcmc$Sigma_omega <- array(NA, dim=c(Nit, Q, Q))
-    mcmc$sigma2 <- array(NA, dim=c(Nit, Q))
-    # Store additional parameters
-    mcmc$m_kq <- array(NA, dim=c(Nit, K, Q, L-1))
-    mcmc$xi_kq <- array(NA, dim=c(Nit, K, Q, L-1))
-    mcmc$rho <- array(NA, dim=c(Nit, 1))
-    mcmc$rho_0 <- array(NA,dim = c(Nit,1))
-    mcmc$nu_kq <- array(NA, dim=c(Nit, K, Q))
-    mcmc$nu_kq0 <- array(NA, dim=c(Nit, K, Q))
-    mcmc$gamma_kq <- array(NA, dim=c(Nit, K, Q))
-    mcmc$gamma_kq0 <- array(NA, dim=c(Nit, K, Q))
-    mcmc$eta_kq <- array(NA, dim=c(Nit, K, Q))
+    mcmc$beta <- array(NA,dim = c(Nit, K, Q, L))
+    
+    mcmc$tau_kq2 <- array(NA, dim=c(Nit, K, Q))
+    
     mcmc$beta_kq0 <- array(NA, dim=c(Nit, K, Q))
-    mcmc$beta_wo_intcp <- array(NA, dim=c(Nit, K, Q, L-1))
-    mcmc$beta_whole <- array(NA,dim = c(Nit, K,Q, L))
+    mcmc$nu_kq0 <- array(NA, dim=c(Nit, K, Q))
+    
+    mcmc$Sigma_omega <- array(NA, dim=c(Nit, Q, Q))
+    
     mcmc$tau_vec = array(NA,dim = c(Nit,Q))
     mcmc$lambda_vec = array(NA,dim = c(Nit,Q))
+    
+    mcmc$sigma2 <- array(NA, dim=c(Nit, Q))
+    
 
-    initial <- init(Q,S,K,L,I,J_max,data_index,t)
+    initial <- init(Q,S,K,L,I,J_max,
+                    data_index,t,K_mat)
 
 
     # Store initial values in the first row of mcmc
     mcmc$alpha[1, , ] <- initial$alpha
-    # mcmc$omega[ , ] <- initial$omega
+    mcmc$beta[1, , , ] <- initial$beta
+    
+    mcmc$tau_kq2[1, , ] <- initial$tau_kq2
+    
+    mcmc$beta_kq0[1, , ] <- initial$beta_kq0
+    mcmc$nu_kq0[1, , ] <- initial$nu_kq0
+    
+    
     current_omega <- initial$omega
     mcmc$Sigma_omega[1, , ] <- initial$Sigma_omega
-    mcmc$sigma2[1, ] <- initial$sigma2
-    mcmc$m_kq[1, , , ] <- initial$m_kq
-    mcmc$xi_kq[1, , , ] <- initial$xi_kq
-    mcmc$rho[1] <- initial$rho
-    mcmc$rho_0[1] <- initial$rho_0
-    mcmc$nu_kq[1, , ] <- initial$nu_kq
-    mcmc$nu_kq0[1, , ] <- initial$nu_kq0
-    mcmc$gamma_kq[1, , ] <- initial$gamma_kq
-    mcmc$gamma_kq0[1, , ] <- initial$gamma_kq0
-    mcmc$eta_kq[1, , ] <- initial$eta_kq
-    mcmc$beta_kq0[1, , ] <- initial$beta_kq0
-    mcmc$beta_wo_intcp[1, , , ] <- initial$beta_wo_intcp
-    mcmc$beta_whole[1, , , ] <- initial$beta_whole
+    
     mcmc$tau_vec[1, ] = initial$tau_vec
-    mcmc$lambda_vec[1,] = initial$lambda_vec
+    mcmc$lambda_vec[1, ] = initial$lambda_vec
     current_theta_iq = initial$theta_iq
+    
+    mcmc$sigma2[1, ] <- initial$sigma2
+    
 
     for (nit in 2:Nit) {
       if (display_process == TRUE && nit %% 1000 == 0) {
         print(paste0("current iteration ", nit))
       }
-      mcmc$alpha[nit,,] <- update_alpha_cpp(mcmc$beta_whole[nit-1,,,], current_omega,current_theta_iq,
-                                            c(mcmc$sigma2[nit-1,]),data_index,
-                                            y, B_cpp, Z_cpp, g_cpp, Z_sum,  V_alpha_inv,
-                                            V_alpha_inv_mu_alpha)
-
-
-      mcmc$eta_kq[nit, , ] = update_eta_kq_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit-1, , , ],
-                                               current_omega,current_theta_iq,
-                                               mcmc$sigma2[nit-1, ], mcmc$beta_kq0[nit-1, , ], mcmc$xi_kq[nit-1, , ,],
-                                               mcmc$gamma_kq[nit-1, , ], mcmc$nu_kq[nit-1, , ],
-                                               y, Z_cpp, B_cpp,g_cpp,data_index
-      )
-
-
-      mcmc$xi_kq[nit, , , ] = update_xi_kq_cpp(mcmc$alpha[nit, ,], mcmc$beta_wo_intcp[nit-1, , , ],
-                                               current_omega,current_theta_iq,
-                                               c(mcmc$sigma2[nit-1,]), mcmc$beta_kq0[nit-1, , ],
-                                               mcmc$eta_kq[nit, ,], mcmc$m_kq[nit-1, , , ],
-                                               g_cpp, data_index,y,Z_cpp,B_cpp)
-
-      update_beta_wo_eta_xi_std_list = update_beta_wo_eta_xi_std(mcmc$eta_kq[nit, , ], mcmc$xi_kq[nit, , , ])
-      mcmc$beta_wo_intcp[nit, , , ] = update_beta_wo_eta_xi_std_list$current_beta_wo_intcp
-      mcmc$eta_kq[nit, , ] = update_beta_wo_eta_xi_std_list$eta_update_std
-      mcmc$xi_kq[nit, , ,] = update_beta_wo_eta_xi_std_list$xi_update_std
-
-      mcmc$gamma_kq[nit, , ] = update_gamma_kq(mcmc$eta_kq[nit, , ],mcmc$rho[nit-1],nu_0, mcmc$nu_kq[nit-1, , ])
-      mcmc$nu_kq[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$eta_kq[nit, ,],mcmc$gamma_kq[nit, ,])
-      mcmc$rho[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq[nit, ,])
-      mcmc$m_kq[nit, ,,] = update_mkql(mcmc$xi_kq[nit, ,,])
-
-      # update intercept
-      mcmc$beta_kq0[nit, ,] = update_beta_kq0_cpp(mcmc$alpha[nit,,], mcmc$beta_wo_intcp[nit, , ,],
+      
+      
+      mcmc$alpha[nit,,] <- update_alpha_cpp(mcmc$beta[nit-1,,,], mcmc$beta_kq0[nit-1,,],
+                                            current_omega, current_theta_iq, c(mcmc$sigma2[nit-1,]),
+                                            y, data_index, 
+                                            B_cpp, Z_cpp, g_cpp, Z_sum,  V_alpha_inv,
+                                            V_alpha_inv_mu_alpha) 
+      
+      
+      
+      mcmc$beta[nit,,,] = update_beta_kq_cpp(mcmc$alpha[nit,,], mcmc$beta[nit-1,,,],mcmc$beta_kq0[nit-1,,],
+                                             current_omega,current_theta_iq,c(mcmc$sigma2[nit-1,]), 
+                                             y, data_index,K_mat,mcmc$tau_kq2[nit-1, , ],  B_cpp,Z_cpp,g_cpp)
+      
+      
+      mcmc$tau_kq2[nit,,] = update_tau_kq_gamma(a_eta, b_eta, mcmc$beta[nit,,,], K_mat)
+      
+      
+      mcmc$beta_kq0[nit, ,] = update_beta_kq0_cpp(mcmc$alpha[nit,,], mcmc$beta[nit,,,], 
                                                   current_omega,current_theta_iq,
-                                                  mcmc$sigma2[nit-1,],
-                                                  mcmc$gamma_kq0[nit-1,,],mcmc$nu_kq0[nit-1,,],
-                                                  y,Z_cpp,B_cpp,g_cpp,data_index)
-      # update the hyper parameters for intercept
-      mcmc$gamma_kq0[nit, ,] = update_gamma_kq(mcmc$beta_kq0[nit, ,], mcmc$rho_0[nit-1],nu_0,
-                                               mcmc$nu_kq0[nit-1,,],intercept = TRUE)
-      mcmc$nu_kq0[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$beta_kq0[nit, ,],mcmc$gamma_kq0[nit, ,],
+                                                  mcmc$sigma2[nit-1,], 
+                                                  mcmc$nu_kq0[nit-1,,],
+                                                  y,data_index,B_cpp,Z_cpp,g_cpp) 
+      
+      mcmc$nu_kq0[nit, ,] = update_nu_kq(a_nu,b_nu,mcmc$beta_kq0[nit,,],
                                          intercept = TRUE)
-      mcmc$rho_0[nit] = update_rho_kq(a_rho,b_rho,mcmc$gamma_kq0[nit, ,],intercept = TRUE)
-      # update a complete beta
-      mcmc$beta_whole[nit, , , ] = update_whole_beta(mcmc$beta_kq0[nit, ,],mcmc$beta_wo_intcp[nit, , ,])
-
-      # update omega
-      # mcmc$omega[nit,,] = omega
-      current_omega <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ],
+      
+      
+      # Update Omega
+      current_omega <- update_omega_cpp(mcmc$alpha[nit,,], mcmc$beta[nit,,,],mcmc$beta_kq0[nit,,],
                                         current_omega,current_theta_iq,
-                                        c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,],
-                                        y, Z_cpp, B_cpp, g_cpp,
-                                        data_index)
+                                        c(mcmc$sigma2[nit-1,]), mcmc$Sigma_omega[nit-1,,], 
+                                        y, data_index,B_cpp,Z_cpp,g_cpp
+      )
       # update Sigma_omega
-      # mcmc$Sigma_omega[nit,,] = Sigma_omega
       mcmc$Sigma_omega[nit,,] <- update_Sigma_omega_cpp(current_omega, mcmc$Sigma_omega[nit-1,,])
-
-
+      
+      
       # update Sigma_omega
-      current_theta_iq = update_theta_iq_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ],
+      current_theta_iq = update_theta_iq_cpp(mcmc$alpha[nit,,], mcmc$beta[nit,,,],mcmc$beta_kq0[nit,,],
                                              current_omega,c(mcmc$sigma2[nit-1,]),
-                                             data_index, y, B_cpp, Z_cpp,g_cpp,
-                                             t, mcmc$tau_vec[nit-1,],mcmc$lambda_vec[nit-1,])
-
+                                             y,data_index,t,t,B_cpp,Z_cpp,g_cpp,
+                                             mcmc$tau_vec[nit-1,],mcmc$lambda_vec[nit-1,])
+      
+      
       # update tau_q
-
       mcmc$tau_vec[nit, ] = update_tau_q_cpp(current_theta_iq, a_tau, b_tau,
-                                             data_index, t, mcmc$lambda_vec[nit-1,])
-
+                                             data_index,t, mcmc$lambda_vec[nit-1,])
+      
       # update lambda_q
       mcmc$lambda_vec[nit, ] = update_lambda_q_cpp( mcmc$lambda_vec[nit-1,], a_lamb, b_lamb,
                                                     current_theta_iq, mcmc$tau_vec[nit, ],
                                                     data_index, t, 0.05)
 
-
       # update sigma2
       # mcmc$sigma2[nit,] = sigma2
-      mcmc$sigma2[nit,] <- update_sigma2_cpp(mcmc$alpha[nit,,], mcmc$beta_whole[nit, , , ],
+      
+      mcmc$sigma2[nit,] <- update_sigma2_cpp(mcmc$alpha[nit,,], mcmc$beta[nit, , , ], mcmc$beta_kq0[nit,,],
                                              current_omega, current_theta_iq,
-                                             y, Z_cpp, B_cpp, data_index, g_cpp,h_1, h_2)
+                                             y, data_index,B_cpp, Z_cpp, g_cpp,h_1,h_2)
     }
 
 
@@ -572,11 +540,13 @@ mcmc_BayTetra <- function(data,
 
 
     post_alpha_samples = mcmc$alpha[index_list, , ]
-    post_beta_samples = mcmc$beta_whole[index_list, , , ]
+    post_beta_samples = mcmc$beta[index_list, , , ]
+    
+    post_beta_kq0_samples = mcmc$beta_kq0[index_list,,]
+    post_tau_kq2_samples = mcmc$tau_kq2[index_list,,]
+    
     post_Sigma_omega_samples = mcmc$Sigma_omega[index_list, , ]
     post_sigma_samples = mcmc$sigma2[index_list, ]
-    post_gamma_kq_samples = mcmc$gamma_kq[index_list, , ]
-    post_gamma_kq0_samples = mcmc$gamma_kq0[index_list, , ]
     post_tau_samples = mcmc$tau_vec[index_list,  ]
     post_lambda = mcmc$lambda_vec[index_list , ]
 
@@ -585,12 +555,13 @@ mcmc_BayTetra <- function(data,
     post_samples <- list(
       pos.alpha = post_alpha_samples,
       pos.beta = post_beta_samples,
+      pos.beta_kq0 = post_beta_kq0_samples,
+      pos.eta_kq2 = post_tau_kq2_samples,
+      
       pos.Sigma_omega = post_Sigma_omega_samples,
       pos.tau_q = post_tau_samples,
       pos.lambda_q = post_lambda,
-      pos.sigma2 = post_sigma_samples,
-      pos.gamma_kq = post_gamma_kq_samples,
-      pos.gamma_kq0 = post_gamma_kq0_samples
+      pos.sigma2 = post_sigma_samples
 
     )
     class(post_samples) = "Post_BayTetra"
@@ -599,179 +570,11 @@ mcmc_BayTetra <- function(data,
 
   }else{
 
-    # start to collapse the dim
+    stop("Q = 1 case is currently not finished")
 
-    y_cs = y[,1,]
-    Z_cs = Z[,1, , ]
-    B_cs = B[,1, , ]
-    data_index_cs = data_index[,1,]
+   }
 
 
-
-    V_alpha_inv <- chol2inv(chol(V_alpha));
-    V_alpha_inv_mu_alpha <- V_alpha_inv %*% mu_alpha;
-
-
-    # pre-calculated data for saving running time
-    Z_sum <- array(0, dim=c(S, S))
-
-
-    for (i in 1:I){
-      k <- g[i]
-      data_index_iq <- which(data_index_cs[i,] == 1)
-
-      if(length(data_index_iq)>1){
-        Z_sum <- Z_sum + t(Z_cs[i,data_index_iq,])%*%Z_cs[i,data_index_iq,]
-
-      } else if(length(data_index_iq)==1) {
-        Z_iq <- as.matrix(Z_cs[i, data_index_iq, ])
-        Z_sum <- Z_sum + Z_iq %*% t(Z_iq)
-
-      }
-    }
-
-    y = y_cs
-    Z = Z_cs
-    B = B_cs
-    data_index = data_index_cs
-
-
-    B[is.na(B)] <- 0
-    Z[is.na(Z)] <- 0
-    y[is.na(y)] <- 0
-
-
-    g_cpp = g-1 # to match the index in Rcpp, so that g[i] from 0 to K-1
-
-
-    # Initialize MCMC storage object
-    mcmc <- list()
-
-    # Initialize alpha, beta, omega, Sigma_omega, sigma2
-    mcmc$alpha <- array(NA, dim=c(Nit,  S))
-    mcmc$sigma2 <- array(NA, dim=c(Nit))
-    # Store additional parameters
-    mcmc$m_kq <- array(NA, dim=c(Nit, K, L-1))
-    mcmc$xi_kq <- array(NA, dim=c(Nit, K, L-1))
-    mcmc$rho <- array(NA, dim=c(Nit))
-    mcmc$rho_0 <- array(NA,dim = c(Nit))
-    mcmc$nu_kq <- array(NA, dim=c(Nit, K))
-    mcmc$nu_kq0 <- array(NA, dim=c(Nit, K))
-    mcmc$gamma_kq <- array(NA, dim=c(Nit, K))
-    mcmc$gamma_kq0 <- array(NA, dim=c(Nit, K))
-    mcmc$eta_kq <- array(NA, dim=c(Nit, K))
-    mcmc$beta_kq0 <- array(NA, dim=c(Nit, K))
-    mcmc$beta_wo_intcp <- array(NA, dim=c(Nit, K,  L-1))
-    mcmc$beta_whole <- array(NA,dim = c(Nit, K, L))
-
-    initial <- init_Q1(Q,S,K,L,I)
-
-
-    # Store initial values in the first row of mcmc
-    mcmc$alpha[1, ] <- initial$alpha
-    mcmc$sigma2[1] <- initial$sigma2
-    mcmc$m_kq[1, ,  ] <- initial$m_kq
-    mcmc$xi_kq[1, , ] <- initial$xi_kq
-    mcmc$rho[1] <- initial$rho
-    mcmc$rho_0[1] <- initial$rho
-    mcmc$nu_kq[1, ] <- initial$nu_kq
-    mcmc$nu_kq0[1, ] <- initial$nu_kq0
-    mcmc$gamma_kq[1, ] <- initial$gamma_kq
-    mcmc$gamma_kq0[1,  ] <- initial$gamma_kq
-    mcmc$eta_kq[1, ] <- initial$eta_kq
-    mcmc$beta_kq0[1, ] <- initial$beta_kq0
-    mcmc$beta_wo_intcp[1, , ] <- initial$beta_wo_intcp
-    mcmc$beta_whole[1, , ] <- initial$beta_whole
-
-
-    for (nit in 2:Nit) {
-      if (display_process == TRUE && nit %% 1000 == 0) {
-        print(paste0("current iteration ", nit))
-      }
-      mcmc$alpha[nit,] <- update_alpha_Q1_cpp(mcmc$beta_whole[nit-1,,],mcmc$sigma2[nit-1],
-                                              data_index, y, B, Z, g_cpp, Z_sum,  V_alpha_inv,
-                                              V_alpha_inv_mu_alpha)
-      # update eta_kq
-      mcmc$eta_kq[nit, ] = update_eta_kq_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_wo_intcp[nit-1, , ],
-                                                mcmc$sigma2[nit-1],
-                                                mcmc$beta_kq0[nit-1, ], mcmc$xi_kq[nit-1, , ],
-                                                mcmc$gamma_kq[nit-1, ], mcmc$nu_kq[nit-1,  ],
-                                                y, Z, B,g_cpp,data_index)
-
-      mcmc$xi_kq[nit, , ] = update_xi_kq_Q1_cpp(mcmc$alpha[nit, ], mcmc$beta_wo_intcp[nit-1, , ],
-                                                mcmc$sigma2[nit-1], mcmc$beta_kq0[nit-1, ],
-                                                mcmc$eta_kq[nit, ], mcmc$m_kq[nit-1, ,  ],
-                                                g_cpp, data_index,y,Z,B)
-
-      # standardize these eta_kq and xi_kq
-      update_beta_wo_eta_xi_std_list = update_beta_wo_eta_xi_std_Q1(mcmc$eta_kq[nit, ], mcmc$xi_kq[nit, , ])
-      mcmc$beta_wo_intcp[nit, , ] = update_beta_wo_eta_xi_std_list$current_beta_wo_intcp
-      mcmc$eta_kq[nit,  ] = update_beta_wo_eta_xi_std_list$eta_update_std
-      mcmc$xi_kq[nit, , ] = update_beta_wo_eta_xi_std_list$xi_update_std
-
-      # update hyper parameter for non-intercept
-      mcmc$gamma_kq[nit,  ] = update_gamma_kq_Q1(mcmc$eta_kq[nit,  ],mcmc$rho[nit-1],nu_0, mcmc$nu_kq[nit-1,  ])
-
-      mcmc$nu_kq[nit, ] = update_nu_kq_Q1(a_nu,b_nu,mcmc$eta_kq[nit, ],mcmc$gamma_kq[nit, ])
-      mcmc$rho[nit] = update_rho_kq_Q1(a_rho,b_rho,mcmc$gamma_kq[nit, ])
-
-      mcmc$m_kq[nit, ,] = update_mkql_Q1(mcmc$xi_kq[nit, ,])
-
-
-      # update intercept
-      mcmc$beta_kq0[nit, ] = update_beta_kq0_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_wo_intcp[nit, , ],
-                                                    mcmc$sigma2[nit-1], mcmc$gamma_kq0[nit-1,],
-                                                    mcmc$nu_kq0[nit-1,],
-                                                    y,Z,B,g_cpp,data_index)
-
-      # update the hyper parameters for intercept
-      mcmc$gamma_kq0[nit, ] = update_gamma_kq_Q1(mcmc$beta_kq0[nit, ], mcmc$rho_0[nit-1],nu_0,
-                                                 mcmc$nu_kq0[nit-1,],intercept = TRUE)
-
-      mcmc$nu_kq0[nit, ] = update_nu_kq_Q1(a_nu,b_nu,mcmc$beta_kq0[nit, ],mcmc$gamma_kq0[nit, ],
-                                           intercept = TRUE)
-      mcmc$rho_0[nit] = update_rho_kq_Q1(a_rho,b_rho,mcmc$gamma_kq0[nit, ],intercept = TRUE)
-      # update a complete beta
-      mcmc$beta_whole[nit, , ] = update_whole_beta_Q1(mcmc$beta_kq0[nit, ],mcmc$beta_wo_intcp[nit, , ])
-
-
-
-      # update sigma2
-      mcmc$sigma2[nit] <- update_sigma2_Q1_cpp(mcmc$alpha[nit,], mcmc$beta_whole[nit, , ],
-                                               y,Z,B, data_index , g_cpp,h_1,h_2)
-
-    }
-
-
-
-
-    # mcmc=mcmc_result
-    total_iterations = Nit
-    # Calculate the number of posterior samples
-    num_samples <- total_iterations - burn_in
-    # Generate the index list
-    index_list <- seq(burn_in+1, total_iterations, by = thin_factor)
-
-
-
-
-    post_alpha_samples = mcmc$alpha[index_list,  ]
-    post_beta_samples = mcmc$beta_whole[index_list,  , ]
-    post_sigma_samples = mcmc$sigma2[index_list]
-    post_gamma_kq_samples = mcmc$gamma_kq[index_list, ]
-    post_gamma_kq0_samples = mcmc$gamma_kq0[index_list, ]
-
-
-    post_samples <- list(
-      pos.alpha = post_alpha_samples,
-      pos.beta = post_beta_samples,
-      pos.sigma2 = post_sigma_samples,
-      pos.gamma_kq = post_gamma_kq_samples,
-      pos.gamma_kq0 = post_gamma_kq0_samples
-    )
-    class(post_samples) = "Post_BayTetra"
-    # Return only the posterior samples
-    return(post_samples)
 
 
 
@@ -781,7 +584,7 @@ mcmc_BayTetra <- function(data,
 
 
 
-}
+
 
 
 

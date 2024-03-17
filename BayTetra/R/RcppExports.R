@@ -10,9 +10,6 @@ NULL
 #' @importFrom Rcpp sourceCpp
 NULL
 
-#' @importFrom Rcpp sourceCpp
-NULL
-
 dmvn_rcpp <- function(x, mean, sigma, logd = FALSE) {
     .Call(`_BayTetra_dmvn_rcpp`, x, mean, sigma, logd)
 }
@@ -37,33 +34,28 @@ dinv_gamma_rcpp <- function(x, alpha, beta, logd = FALSE) {
 }
 
 #' @noRd
-update_alpha_cpp <- function(beta, omega, theta_iq, sigma2, data_index, y, B, Z, g, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha) {
-    .Call(`_BayTetra_update_alpha_cpp`, beta, omega, theta_iq, sigma2, data_index, y, B, Z, g, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha)
+update_alpha_cpp <- function(beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, B, Z, g_cpp, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha) {
+    .Call(`_BayTetra_update_alpha_cpp`, beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, B, Z, g_cpp, Z_sum, V_alpha_inv, V_alpha_inv_mu_alpha)
 }
 
 #' @noRd
-update_eta_kq_cpp <- function(alpha, beta, omega, theta_iq, sigma2, beta_kq0, xi, gamma_kq, nu_kq, y, Z, B, g_cpp, data_index) {
-    .Call(`_BayTetra_update_eta_kq_cpp`, alpha, beta, omega, theta_iq, sigma2, beta_kq0, xi, gamma_kq, nu_kq, y, Z, B, g_cpp, data_index)
+update_beta_kq0_cpp <- function(alpha, beta, omega, theta_iq, sigma2, nu_kq0, y, data_index, B, Z, g_cpp) {
+    .Call(`_BayTetra_update_beta_kq0_cpp`, alpha, beta, omega, theta_iq, sigma2, nu_kq0, y, data_index, B, Z, g_cpp)
 }
 
 #' @noRd
-update_xi_kq_cpp <- function(alpha, beta, omega, theta_iq, sigma2, beta_kq0, eta, m, g_cpp, data_index, y, Z, B) {
-    .Call(`_BayTetra_update_xi_kq_cpp`, alpha, beta, omega, theta_iq, sigma2, beta_kq0, eta, m, g_cpp, data_index, y, Z, B)
+update_beta_kq_cpp <- function(alpha, beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, K_mat, tau_kq2, B, Z, g_cpp) {
+    .Call(`_BayTetra_update_beta_kq_cpp`, alpha, beta, beta_kq0, omega, theta_iq, sigma2, y, data_index, K_mat, tau_kq2, B, Z, g_cpp)
 }
 
 #' @noRd
-update_beta_kq0_cpp <- function(alpha, beta, omega, theta_iq, sigma2, gamma_kq0, nu_kq0, y, Z, B, g_cpp, data_index) {
-    .Call(`_BayTetra_update_beta_kq0_cpp`, alpha, beta, omega, theta_iq, sigma2, gamma_kq0, nu_kq0, y, Z, B, g_cpp, data_index)
+logpost_omega_cpp <- function(i, omega_i, alpha, beta, beta_kq0, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, K, Q, J_max) {
+    .Call(`_BayTetra_logpost_omega_cpp`, i, omega_i, alpha, beta, beta_kq0, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, K, Q, J_max)
 }
 
 #' @noRd
-logpost_omega_cpp <- function(i, omega_i, alpha, beta, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, K, Q, J_max) {
-    .Call(`_BayTetra_logpost_omega_cpp`, i, omega_i, alpha, beta, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, K, Q, J_max)
-}
-
-#' @noRd
-update_omega_cpp <- function(alpha, beta, omega, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, omega_var_update = 0.04) {
-    .Call(`_BayTetra_update_omega_cpp`, alpha, beta, omega, theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, omega_var_update)
+update_omega_cpp <- function(alpha, beta, beta_kq0, omega, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, omega_var_update = 0.04) {
+    .Call(`_BayTetra_update_omega_cpp`, alpha, beta, beta_kq0, omega, theta_iq, sigma2, Sigma_omega, y, data_index, B, Z, g_cpp, omega_var_update)
 }
 
 #' @noRd
@@ -76,8 +68,9 @@ update_Sigma_omega_cpp <- function(omega, Sigma_omega, Sigma_omega_step = 0.008)
     .Call(`_BayTetra_update_Sigma_omega_cpp`, omega, Sigma_omega, Sigma_omega_step)
 }
 
-update_theta_iq_cpp <- function(alpha, beta, omega, sigma2, data_index, y, B, Z, g, t, tau_q_vec, lambda_q_vec) {
-    .Call(`_BayTetra_update_theta_iq_cpp`, alpha, beta, omega, sigma2, data_index, y, B, Z, g, t, tau_q_vec, lambda_q_vec)
+#' @noRd
+update_theta_iq_cpp <- function(alpha, beta, beta_kq0, omega, sigma2, y, data_index, t_std, t_org, B, Z, g_cpp, tau_q_vec, lambda_q_vec) {
+    .Call(`_BayTetra_update_theta_iq_cpp`, alpha, beta, beta_kq0, omega, sigma2, y, data_index, t_std, t_org, B, Z, g_cpp, tau_q_vec, lambda_q_vec)
 }
 
 #' @noRd
@@ -90,6 +83,8 @@ logpost_lambda_normpart_cpp <- function(q, theta_iq, lambda_q, tau_q, data_index
     .Call(`_BayTetra_logpost_lambda_normpart_cpp`, q, theta_iq, lambda_q, tau_q, data_index, t)
 }
 
+#' @importFrom Rcpp sourceCpp
+#' @noRd
 update_lambda_q_cpp <- function(lambda, a_lam, b_lam, theta_iq, tau_q_vec, data_index, t, lambda_step = 0.1) {
     .Call(`_BayTetra_update_lambda_q_cpp`, lambda, a_lam, b_lam, theta_iq, tau_q_vec, data_index, t, lambda_step)
 }
@@ -100,8 +95,8 @@ update_lambda_q_cpp_wth_accept <- function(lambda, a_lam, b_lam, theta_iq, tau_q
 }
 
 #' @noRd
-update_sigma2_cpp <- function(alpha, beta, omega, theta_iq, y, Z, B, data_index, g, h_1, h_2) {
-    .Call(`_BayTetra_update_sigma2_cpp`, alpha, beta, omega, theta_iq, y, Z, B, data_index, g, h_1, h_2)
+update_sigma2_cpp <- function(alpha, beta, beta_kq0, omega, theta_iq, y, data_index, B, Z, g_cpp, h_1, h_2) {
+    .Call(`_BayTetra_update_sigma2_cpp`, alpha, beta, beta_kq0, omega, theta_iq, y, data_index, B, Z, g_cpp, h_1, h_2)
 }
 
 #' @noRd

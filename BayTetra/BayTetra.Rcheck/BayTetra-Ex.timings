@@ -1,0 +1,6 @@
+name	user	system	elapsed
+Generate_simulated_data	0	0	0	
+Test_BayTetra	0	0	0	
+ex_data	0.009	0.000	0.008	
+mcmc_BayTetra	0.001	0.000	0.000	
+summary.Test_BayTetra	0	0	0	

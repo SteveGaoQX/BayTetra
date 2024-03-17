@@ -1,0 +1,20 @@
+* installing *source* package ‘BayTetra’ ...
+** using staged installation
+** libs
+using C++ compiler: ‘g++ (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0’
+g++ -std=gnu++17 -I"/opt/R/4.3.3/lib/R/include" -DNDEBUG  -I'/cloud/lib/x86_64-pc-linux-gnu-library/4.3/Rcpp/include' -I'/cloud/lib/x86_64-pc-linux-gnu-library/4.3/RcppArmadillo/include' -I/usr/local/include   -fopenmp -fpic  -g -O2  -c BayTetra_cpp_function.cpp -o BayTetra_cpp_function.o
+g++ -std=gnu++17 -I"/opt/R/4.3.3/lib/R/include" -DNDEBUG  -I'/cloud/lib/x86_64-pc-linux-gnu-library/4.3/Rcpp/include' -I'/cloud/lib/x86_64-pc-linux-gnu-library/4.3/RcppArmadillo/include' -I/usr/local/include   -fopenmp -fpic  -g -O2  -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17 -shared -L/opt/R/4.3.3/lib/R/lib -L/usr/local/lib -o BayTetra.so BayTetra_cpp_function.o RcppExports.o -fopenmp -llapack -lblas -lgfortran -lm -lquadmath -L/opt/R/4.3.3/lib/R/lib -lR
+installing to /cloud/project/BayTetra/BayTetra.Rcheck/00LOCK-BayTetra/00new/BayTetra/libs
+** R
+** data
+*** moving datasets to lazyload DB
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (BayTetra)

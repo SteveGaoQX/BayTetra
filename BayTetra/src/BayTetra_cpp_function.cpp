@@ -114,60 +114,81 @@ double dinv_gamma_rcpp(double x, double alpha, double beta, bool logd = false) {
 
 //' @noRd
 // [[Rcpp::export]]
-arma::mat update_alpha_cpp(const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq,
-                           const arma::vec& sigma2,const arma::cube& data_index,
-                           const arma::cube& y, const arma::field<arma::cube>& B,
-                           const arma::field<arma::cube>& Z, const arma::vec& g, const arma::cube& Z_sum,
+arma::mat update_alpha_cpp(const arma::cube& beta, const arma::mat& beta_kq0, 
+                           const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2,
+                           const arma::cube& y,const arma::cube& data_index,
+                           const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, 
+                           const arma::vec& g_cpp, const arma::cube& Z_sum,
                            const arma::mat& V_alpha_inv, const arma::vec& V_alpha_inv_mu_alpha){
   // Update the alpha
   // args: 1: beta is K*Q*L at t-1 time
-  //       2: omega is the I*Q mat at t-1 time
-  //       3: sigma2 is the length Q col vect at t-1 time
-  // returns: the updates alpha
-
-
+  //       2: beta_kq0 is K*Q dim 
+  //       3: beta_kqt is K*Q
+  //       4: omega is the I*Q mat at t-1 time
+  //       5: theta_iq dim I*Q*J_max
+  //       6: sigma2 is the length Q col vect at t-1 time
+  //       7: data_index dim I*Q*J_max
+  //       8: y dim I*Q*J_max
+  //       9: t dim I*Q*J_max
+  //       10: B dim I*Q*J_max*L (L is the length after shrinkage, here we do not add intercept on B)
+  //       11: Z dim I*Q*J_max*S
+  //       12: g vec length I
+  //       13: Z_sum dim Q*S*S (?)
+  
+  // returns: the updates alpha at dim Q*S
+  
+  
   // Get dimensions from the data
   int K = beta.n_rows;
   int Q = beta.n_cols;
   int S = Z_sum.n_cols; // Z_sum in dim Q*S*S
-  int I = g.n_elem;
+  int I = g_cpp.n_elem;
   int J_max = data_index.n_slices; // data_index in dim I*Q*J_max
   //cout << "K:" << K << "  Q: "<< Q <<endl;
   arma::mat alpha_update(Q, S, arma::fill::none);
   arma::mat V_n(S, S);
   arma::vec mu_n(S);
-
+  
   for (int q = 0; q < Q; ++q){
-
+    
     arma::vec Zy_sum(S, arma::fill::zeros);
-
+    
     for (int i = 0; i < I; i++){
-
-      int k = g(i);
+      
+      int k = g_cpp(i);
       //cout<< "i:  "<< i <<" k: "<< k<<endl;
       arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1);
-
+      
       arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1 );
       arma::mat B_iq = B_iq_raw.rows(data_index_iq);
       arma::vec beta_kq = beta.tube(k, q);
       arma::vec beta_Kq = beta.tube(K-1, q);
-
+      
+      // arma::vec t_vec = t.tube(i, q);
+      // arma::vec t_selected = t_vec.elem(data_index_iq);
+      // 
+      // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+      // arma::vec t_beta_Kqt = u(K-1,q)*t_selected;
+      
+      arma::vec beta_kq0_vec(data_index_iq.size(), arma::fill::zeros);
+      beta_kq0_vec.fill(beta_kq0(k, q));
+      
       arma::vec omega_vec(data_index_iq.size(), arma::fill::zeros);
       omega_vec.fill(omega(i, q));
-
-
+      
+      
       // extract theta_iq
       arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
       arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
+      
       arma::vec y_vec = arma::vectorise(y.tube(i, q));
       arma::vec y_selected = y_vec.elem(data_index_iq);
       arma::vec y_tilde_iq;
       if (k == K-1){ // baseline
-        y_tilde_iq = y_selected - B_iq * beta_kq - omega_vec - select_cur_theta_iq;
+        y_tilde_iq = y_selected - B_iq * beta_Kq - omega_vec - select_cur_theta_iq;
       } else { // not baseline
-        y_tilde_iq = y_selected - B_iq * beta_Kq -
-          B_iq * beta_kq - omega_vec - select_cur_theta_iq;
+        y_tilde_iq = y_selected - B_iq * beta_Kq - beta_kq0_vec - B_iq * beta_kq -
+          omega_vec - select_cur_theta_iq;
       }
       arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1);
       arma::mat Z_selected = Z_iq_raw.rows(data_index_iq);
@@ -183,558 +204,416 @@ arma::mat update_alpha_cpp(const arma::cube& beta, const arma::mat& omega, const
 
 
 //' @noRd
-// [[Rcpp::export]]
-arma::mat update_eta_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq,
-                            const arma::vec& sigma2, const arma::mat& beta_kq0,
-                            const arma::cube& xi, const arma::mat& gamma_kq, const arma::mat& nu_kq,
-                            const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g_cpp, const arma::cube& data_index){
-  //cout << "updating eta in cpp" << endl;
-  int K = beta.n_rows;
-  int Q = beta.n_cols;
-  int L = B(0).n_slices;
-  int n = y.n_rows;
-  int J_max = B(0).n_cols;
-  arma::mat eta_update(K, Q, arma::fill::zeros);
-  try {
-    for (int k = 0; k < K-1; ++k){
-      for (int q = 0; q < Q; ++q){
-        double Sigma_eta_sum = 0;
-        double mu_eta_sum = 0;
-        arma::uvec index_k = find(g_cpp == k);
-        arma::vec beta_Kq = beta.tube(K-1, q); // this can be put outside the for loop for i
-        //cout<< "Current k:"<< k <<"q:"<< q <<"\n"<<"\n"<<endl;
-
-        for (auto i : index_k){
-
-          arma::uvec data_index_iq = find(data_index.tube(i,q) == 1);
-
-          int Iq_j = data_index_iq.size();
-          arma::vec y_tilde_iq;
-
-          // take Z^T alpha_q
-          arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
-          arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-          arma::vec alpha_q = alpha.row(q).t();
-
-          // take B[i,q,index_index_iq,2:L-1], i.e do not count intercept
-          arma::mat B_iq_raw = B(i).subcube(q,0,1,q, J_max-1,L-1);
-          arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-          // take beta_kq0
-          arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
-          beta_intcp_vec.fill(beta_kq0(k,q));
-
-          // take omega_i
-          arma::vec omega_vec(Iq_j, arma::fill::zeros);
-          omega_vec.fill(omega(i, q));
-
-          // extract theta_iq
-          arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-          arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-          // take y_iqj (in vec of j)
-          arma::vec y_vec = arma::vectorise(y.tube(i, q));
-          arma::vec y_selected = y_vec.elem(data_index_iq);
-
-
-          y_tilde_iq = y_selected - Z_iq * alpha_q -
-            B_iq* beta_Kq - beta_intcp_vec -  omega_vec - select_cur_theta_iq;
-
-
-          // calculate xi_kq^T B_iqj y_iqj
-          arma::mat B_iqj = B_iq;
-          arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
-          arma::vec xi_kq = xi.tube(k,q);
-
-          mu_eta_sum = mu_eta_sum + dot(B_iqj_wcoeff, xi_kq);
-
-          // calculate (xi_kq^B_iqj-)^2
-          arma::vec vi = B_iqj * xi_kq;
-          Sigma_eta_sum = Sigma_eta_sum + dot(vi,vi);
-          //Rcpp::Rcout << "Sigma_eta_sum: " << Sigma_eta_sum << std::endl;
-        }
-
-        double sigma_eta = 1/ (Sigma_eta_sum/sigma2(q) + 1/(gamma_kq(k,q)*nu_kq(k,q)));
-        double mu_eta = sigma_eta*mu_eta_sum/sigma2(q);
-
-        eta_update(k,q) = Rcpp::rnorm( 1, mu_eta, sqrt(sigma_eta) )[0];
-        //eta_update(k,q) = R::rnorm(mu_eta, sqrt(sigma_eta));
-      }
-    }
-  } catch (const std::runtime_error& e) {
-    // Catch a std::runtime_error, which is thrown by Armadillo for errors such as dimension mismatches
-    Rcpp::Rcout << "Caught a runtime_error exception on eta_first_loops: " << e.what() << std::endl;
-  } catch (const std::exception& e) {
-    // Catch any other standard exceptions
-    Rcpp::Rcout << "Caught an exception on on eta_first_loops: " << e.what() << std::endl;
-  } catch (...) {
-    // Catch all other exceptions
-    Rcpp::Rcout << "Caught an unknown exception on on eta_first_loops!" << std::endl;
-  }
+ // [[Rcpp::export]]
+ arma::mat update_beta_kq0_cpp(const arma::mat& alpha, const arma::cube& beta, 
+                               const arma::mat& omega, const arma::cube& theta_iq, const arma::vec& sigma2,
+                               const arma::mat& nu_kq0,
+                               const arma::cube& y, const arma::cube& data_index, 
+                               const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z,const arma::vec& g_cpp){
+   
+   int K = beta.n_rows;
+   int Q = beta.n_cols;
+   //int L = B(0).n_slices;
+   //int n = y.n_rows;
+   int J_max = B(0).n_cols;
+   arma::mat beta_kq0_update(K, Q, arma::fill::zeros);
+   
+   for (int k = 0; k < K-1; ++k){
+     for (int q = 0; q < Q; ++q){
+       double Sigma_beta_kq0_sum = 0;
+       double mu_beta_kq0_sum = 0;
+       arma::uvec index_k = find(g_cpp == k);
+       
+       for (auto i : index_k){
+         arma::uvec data_index_iq = find(data_index.tube(i,q) == 1);
+         //Rcpp::Rcout << "data_index_iq: " << data_index_iq << std::endl;
+         int J_iq = data_index_iq.size();
+         
+         arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+         arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+         arma::vec alpha_q = alpha.row(q).t();
+         
+         // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+         arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+         arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+         
+         arma::vec beta_Kq = beta.tube(K-1, q); 
+         arma::vec beta_kq = beta.tube(k, q);
+         
+         // take vec_t*beta_kqt or vec_t*beta_Kqt
+         // arma::vec t_vec = t.tube(i, q);
+         // arma::vec t_selected = t_vec.elem(data_index_iq);
+         // 
+         // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+         // arma::vec t_beta_Kqt = beta_kqt(K-1,q)*t_selected;
+         
+         
+         // take omega_i
+         arma::vec omega_vec(J_iq, arma::fill::zeros);
+         omega_vec.fill(omega(i, q));
+         
+         // extract theta_iq
+         arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+         arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+         
+         arma::vec y_vec = arma::vectorise(y.tube(i, q));
+         arma::vec y_selected = y_vec.elem(data_index_iq);
+         
+         arma::vec y_tilde_iq;
+         
+         y_tilde_iq = y_selected - Z_iq * alpha_q - 
+           B_iq* beta_Kq - B_iq*beta_kq - omega_vec - select_cur_theta_iq;
+         
+         mu_beta_kq0_sum = mu_beta_kq0_sum + sum(y_tilde_iq);
+         
+         Sigma_beta_kq0_sum = Sigma_beta_kq0_sum + J_iq;
+         
+       }
+       
+       double sigma_beta_kq0 = 1/ (Sigma_beta_kq0_sum/sigma2(q) + 1/(nu_kq0(k,q)));
+       double mu_beta_kq0 = sigma_beta_kq0*mu_beta_kq0_sum/sigma2(q);
+       beta_kq0_update(k,q) = Rcpp::rnorm(1, mu_beta_kq0, sqrt(sigma_beta_kq0))[0];
+       
+     }
+   }
+   return beta_kq0_update;
+ }
 
 
-
-//cout<< "begin update K for eta" << endl;
-
-
-try {
-  for (int q = 0; q < Q; ++q){
-    double Sigma_eta_sum_K = 0;
-    double mu_eta_sum_K = 0;
-    for (int i = 0; i < n; ++i){
-      int k = g_cpp(i);
-      arma::uvec data_index_iq = find(data_index.tube(i,q) == 1);
-      int Iq_j = data_index_iq.size();
-
-      arma::vec y_tilde_iq;
-
-
-      arma::mat B_iq_raw = B(i).subcube(q,0,1,q, J_max-1,L-1);
-      // B_iq_raw now is dim J_max*(L-1)
-      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-      arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
-      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-      arma::vec alpha_q = alpha.row(q).t();
-
-
-      arma::vec omega_vec(Iq_j, arma::fill::zeros);
-      omega_vec.fill(omega(i, q));
-
-      // extract theta_iq
-      arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-      arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-
-      arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
-      beta_intcp_vec.fill(beta_kq0(k,q));
-      arma::vec beta_kq = beta.tube(k,q);
-
-
-      arma::vec y_vec = arma::vectorise(y.tube(i, q));
-      arma::vec y_selected = y_vec.elem(data_index_iq);
-
-      if (k == K-1){
-        y_tilde_iq = y_selected - Z_iq*alpha_q - omega_vec;
-
-      } else{
-
-        y_tilde_iq = y_selected - Z_iq*alpha_q - B_iq*beta_kq - beta_intcp_vec - omega_vec;
-
-      }
-
-      arma::mat B_iqj = B_iq;
-      arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
-      arma::vec xi_Kq = xi.tube(K-1,q);
-
-      mu_eta_sum_K = mu_eta_sum_K + dot(B_iqj_wcoeff,xi_Kq);
-
-
-      arma::vec vi = B_iqj*xi_Kq;
-      Sigma_eta_sum_K = Sigma_eta_sum_K + dot(vi,vi);
-
-
-    }
-
-
-    double sigma_eta = 1/ (Sigma_eta_sum_K/sigma2(q) + 1/(gamma_kq(K-1,q)*nu_kq(K-1,q)));
-    //sigma_eta = abs(sigma_eta);
-
-    double mu_eta = sigma_eta*mu_eta_sum_K/sigma2(q);
-
-    eta_update(K-1,q) = Rcpp::rnorm( 1, mu_eta, sqrt(sigma_eta) )[0];
-
-
-  }
-} catch (const std::runtime_error& e) {
-  // Catch a std::runtime_error, which is thrown by Armadillo for errors such as dimension mismatches
-  Rcpp::Rcout << "Caught a runtime_error exception on eta_first_loops: " << e.what() << std::endl;
-}
-  //cout << "finish updating eta in cpp" << endl;
-  return eta_update;
-  //gc();
-}
 
 
 //' @noRd
 //[[Rcpp::export]]
-arma::cube update_xi_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega, const arma::cube& theta_iq,
-                            const arma::vec& sigma2, const arma::mat& beta_kq0, const arma::mat& eta,
-                            const arma::cube& m, const arma::vec& g_cpp, const arma::cube& data_index,
-                            const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B){
+arma::cube update_beta_kq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0,
+                              const arma::mat& omega, const arma::cube& theta_iq,const arma::vec& sigma2, 
+                              const arma::cube& y, const arma::cube& data_index,
+                              const arma::mat& K_mat, const arma::mat& tau_kq2,
+                              const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z,const arma::vec& g_cpp){
   //cout<< "begin update xi in cpp"<< endl;
   int K = beta.n_rows;
   int Q = beta.n_cols;
-  int L = B(0).n_slices;
+  int L = beta.n_slices;
   int I = y.n_rows;
-  int J_max = B(0).n_cols;
-
-  arma::cube xi_kq_update(K, Q, L-1, arma::fill::zeros);
-
-
-   // update xi_kq, k = 1,2,...,K-1
-   for (int k = 0; k < K-1; k++){
-     for (int q = 0; q < Q; q++){
-
-       arma::vec beta_Kq = beta.tube(K-1, q); // this can be put outside the for loop for i
-
-       // Indexes for subject in k-th class
-       arma::uvec index_k = arma::find(g_cpp == k);
-       // Initialize sum values
-       arma::mat Sigma_xi_sum(L-1, L-1, arma::fill::zeros);
-       arma::vec mu_xi_sum(L-1, arma::fill::zeros);
-       for (auto i : index_k){
-
-         arma::uvec data_index_iq = arma::find(data_index.tube(i,q) == 1);
-         int Iq_j = data_index_iq.size();
-
-         arma::mat B_iq_raw = B(i).subcube(q,0,1,q, J_max-1,L-1);
-         arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-         arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
-         arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-         arma::vec alpha_q = alpha.row(q).t();
-
-         arma::vec omega_vec(Iq_j, arma::fill::zeros);
-         omega_vec.fill(omega(i, q));
-
-         arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
-         beta_intcp_vec.fill(beta_kq0(k,q));
-
-         // extract theta_iq
-         arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-         arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-         arma::vec y_vec = arma::vectorise(y.tube(i, q));
-         arma::vec y_selected = y_vec.elem(data_index_iq);
-
-
-         arma::vec y_tilde_iq;
-
-         y_tilde_iq = y_selected - Z_iq * alpha_q -
-           B_iq* beta_Kq - beta_intcp_vec - omega_vec - select_cur_theta_iq;
-
-         arma::mat B_iqj = B_iq; //J*(L-1)
-         arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
-
-         arma::mat vi = trans(B_iqj) * B_iqj; //(L-1)*(L-1)
-         Sigma_xi_sum = Sigma_xi_sum + vi;
-
-         mu_xi_sum = mu_xi_sum + B_iqj_wcoeff;
-       }
-       //cout<< "current k:" <<k << "q:" <<q <<endl;
-       //cout<< "Sigma_xi_sum" << Sigma_xi_sum << endl;
-       //cout<< "eta(k,q)" << eta(k,q) <<endl;
-
-       // posterior mean and covariance matrix
-       arma::mat Identity = arma::eye(L-1, L-1);
-       arma::mat mat = Sigma_xi_sum*(pow(eta(k,q),2)/sigma2(q)) + Identity;
-
-       // check if the matrix is symmetric positive definite
-       if(mat.is_sympd()) {
-         arma::mat V_xi = arma::inv_sympd(mat);
-         // continue your computation here
-       } else {
-         arma::mat V_xi = Identity;
-         Rcpp::Rcout << "The matrix is not symmetric positive definite: " << std::endl;
-         mat.print();
-         throw std::range_error("Error: Matrix is not symmetric positive definite.");
-       }
-       //cout << V_xi << endl;
-       arma::mat V_xi = arma::inv_sympd(mat);
-       arma::vec m_kq = m.tube(k,q);
-       arma::vec mu_xi = V_xi * ((eta(k,q)/sigma2(q))*mu_xi_sum + m_kq);
-       //cout<< "m_kq" <<m_kq <<endl;
-
-       //Rcpp::Rcout << "this is k: " << k + 1 << " q: " << q << "\n";
-       //Rcpp::Rcout << "the mean is: " << mu_xi << "\n";
-       //Rcpp::Rcout << "the variance is: " << V_xi << "\n";
-       //arma::vec xi_temp_K = arma::mvnrnd(mu_xi, V_xi); // Draw from multivariate normal distribution
-       //arma::rowvec xi_temp_K_row = xi_temp_K.t(); // Transpose to a row vector
-
-       xi_kq_update.tube(k,q) = rmvn_rcpp(1, mu_xi, V_xi).row(0); // Store row vector
-     }
-   }
-
-
-
-
- try {
-   // update xi_Kq
-   for (int q = 0; q < Q; q++){
-        // Initialize sum values
-        arma::mat Sigma_xi_sum_K(L-1, L-1, arma::fill::zeros);
-        arma::vec mu_xi_sum_K(L-1, arma::fill::zeros);
-
-        for (int i = 0; i < I; i++){
-          int k = g_cpp(i);
-          arma::uvec data_index_iq = find(data_index.tube(i,q) == 1);
-          int Iq_j = data_index_iq.size();
-
-          arma::vec y_tilde_iq;
-
-          arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
-          arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-          arma::vec alpha_q = alpha.row(q).t();
-
-          arma::mat B_iq_raw = B(i).subcube(q,0,1,q, J_max-1,L-1);
-          // B_iq_raw now is dim J_max*(L-1)
-          arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-
-          arma::vec y_vec = arma::vectorise(y.tube(i, q));
-          arma::vec y_selected = y_vec.elem(data_index_iq);
-
-          arma::vec omega_vec(Iq_j, arma::fill::zeros);
-          omega_vec.fill(omega(i, q));
-
-          // extract theta_iq
-          arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-          arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-          if (k == K-1){
-            y_tilde_iq = y_selected - Z_iq*alpha_q - omega_vec - select_cur_theta_iq;
-          } else{
-            arma::vec beta_kq = beta.tube(k,q);
-            arma::vec beta_intcp_vec(Iq_j, arma::fill::zeros);
-            beta_intcp_vec.fill(beta_kq0(k,q));
-
-            y_tilde_iq = y_selected - Z_iq*alpha_q -
-              B_iq*beta_kq - beta_intcp_vec - omega_vec - select_cur_theta_iq;
-          }
-
-
-          arma::mat B_iqj = B_iq;
-          arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
-
-          arma::mat vi = trans(B_iqj) * B_iqj;
-          Sigma_xi_sum_K = Sigma_xi_sum_K + vi;
-
-          mu_xi_sum_K = mu_xi_sum_K + B_iqj_wcoeff;
-        }
-
-
-        arma::mat Identity = arma::eye(L-1, L-1);
-        arma::mat V_xi = arma::inv_sympd(Sigma_xi_sum_K*(pow(eta(K-1,q),2)/sigma2(q)) + Identity);
-        arma::vec m_Kq = m.tube(K-1,q);
-        arma::vec mu_xi = V_xi * ((eta(K-1,q)/sigma2(q))*mu_xi_sum_K + m_Kq);
-
-
-        xi_kq_update.tube(K-1,q) = rmvn_rcpp(1, mu_xi, V_xi).row(0);
-
+  int J_max = y.n_slices;
+  
+  arma::cube beta_kq_update(K, Q, L, arma::fill::zeros);
+  
+  
+  // update xi_kq, k = 1,2,...,K-1
+  for (int k = 0; k < K-1; k++){
+    for (int q = 0; q < Q; q++){
+      
+      // Indexes for subject in k-th class
+      arma::uvec index_k = arma::find(g_cpp == k);
+      // Initialize sum values
+      arma::mat Sigma_beta_sum(L, L, arma::fill::zeros);
+      arma::vec mu_beta_sum(L, arma::fill::zeros);
+      for (auto i : index_k){
+        
+        arma::uvec data_index_iq = arma::find(data_index.tube(i,q) == 1);
+        int J_iq = data_index_iq.size();
+        
+        arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+        arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+        arma::vec alpha_q = alpha.row(q).t();
+        
+        // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+        arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+        arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+        
+        arma::vec beta_Kq = beta.tube(K-1, q); // this can be put outside the for loop for i
+        
+        
+        // take beta_kq0
+        arma::vec beta_kq0_vec(J_iq, arma::fill::zeros);
+        beta_kq0_vec.fill(beta_kq0(k,q));
+        
+        // take omega_i
+        arma::vec omega_vec(J_iq, arma::fill::zeros);
+        omega_vec.fill(omega(i, q));
+        
+        // extract theta_iq
+        arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+        arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+        
+        arma::vec y_vec = arma::vectorise(y.tube(i, q));
+        arma::vec y_selected = y_vec.elem(data_index_iq);
+        
+        arma::vec y_tilde_iq;
+        
+        y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq*beta_Kq -
+          beta_kq0_vec - omega_vec - select_cur_theta_iq;
+        
+        arma::mat B_iqj = B_iq; //J*L
+        arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
+        
+        arma::mat vi = trans(B_iqj) * B_iqj; // L*L
+        Sigma_beta_sum = Sigma_beta_sum + vi;
+        
+        mu_beta_sum = mu_beta_sum + B_iqj_wcoeff;
       }
- } catch (const std::runtime_error& e) {
-   // Catch a std::runtime_error, which is thrown by Armadillo for errors such as dimension mismatches
-   Rcpp::Rcout << "Caught a runtime_error exception: " << e.what() << std::endl;
- } catch (const std::exception& e) {
-   // Catch any other standard exceptions
-   Rcpp::Rcout << "Caught an exception: " << e.what() << std::endl;
- } catch (...) {
-   // Catch all other exceptions
-   Rcpp::Rcout << "Caught an unknown exception!" << std::endl;
- }
-
-
+      //cout<< "current k:" <<k << "q:" <<q <<endl;
+      //cout<< "Sigma_xi_sum" << Sigma_xi_sum << endl;
+      //cout<< "eta(k,q)" << eta(k,q) <<endl;
+      
+      // posterior mean and covariance matrix
+      arma::mat Identity = arma::eye(L, L);
+      arma::mat mat = Sigma_beta_sum/sigma2(q) + K_mat/(tau_kq2(k,q));
+      
+      // check if the matrix is symmetric positive definite
+      if(mat.is_sympd()) {
+        arma::mat V_xi = arma::inv_sympd(mat);
+        // continue your computation here
+      } else {
+        arma::mat V_xi = Identity;
+        Rcpp::Rcout << "The matrix is not symmetric positive definite: " << std::endl;
+        mat.print();
+        throw std::range_error("Error: Matrix is not symmetric positive definite.");
+      }
+      //cout << V_xi << endl;
+      arma::mat V_beta = arma::inv_sympd(mat);
+      arma::vec mu_beta = V_beta*(mu_beta_sum/sigma2(q));
+      //cout<< "m_kq" <<m_kq <<endl;
+      
+      //Rcpp::Rcout << "this is k: " << k + 1 << " q: " << q << "\n";
+      //Rcpp::Rcout << "the mean is: " << mu_xi << "\n";
+      //Rcpp::Rcout << "the variance is: " << V_xi << "\n";
+      //arma::vec xi_temp_K = arma::mvnrnd(mu_xi, V_xi); // Draw from multivariate normal distribution
+      //arma::rowvec xi_temp_K_row = xi_temp_K.t(); // Transpose to a row vector
+      
+      beta_kq_update.tube(k,q) = rmvn_rcpp(1, mu_beta, V_beta).row(0); // Store row vector
+    }
+  }
+  
+  try {
+    // update xi_Kq
+    for (int q = 0; q < Q; q++){
+      // Initialize sum values
+      arma::mat Sigma_beta_sum_K(L, L, arma::fill::zeros);
+      arma::vec mu_beta_sum_K(L, arma::fill::zeros);
+      
+      for (int i = 0; i < I; i++){
+        int k = g_cpp(i);
+        
+        arma::uvec data_index_iq = arma::find(data_index.tube(i,q) == 1);
+        int J_iq = data_index_iq.size();
+        
+        arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+        arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+        arma::vec alpha_q = alpha.row(q).t();
+        
+        // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+        arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+        arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+        
+        arma::vec beta_Kq = beta.tube(K-1, q); // this can be put outside the for loop for i
+        arma::vec beta_kq = beta.tube(k,q);
+        
+        // take vec_t*beta_kqt or vec_t*beta_Kqt
+        // arma::vec t_vec = t.tube(i, q);
+        // arma::vec t_selected = t_vec.elem(data_index_iq);
+        // 
+        // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+        // arma::vec t_beta_Kqt = beta_kqt(K-1,q)*t_selected;
+        
+        // take beta_kq0
+        arma::vec beta_kq0_vec(J_iq, arma::fill::zeros);
+        beta_kq0_vec.fill(beta_kq0(k,q));
+        
+        // take omega_i
+        arma::vec omega_vec(J_iq, arma::fill::zeros);
+        omega_vec.fill(omega(i, q));
+        
+        // extract theta_iq
+        arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+        arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+        
+        arma::vec y_vec = arma::vectorise(y.tube(i, q));
+        arma::vec y_selected = y_vec.elem(data_index_iq);
+        
+        arma::vec y_tilde_iq;
+        
+        if (k == K-1){
+          y_tilde_iq = y_selected - Z_iq*alpha_q - omega_vec - select_cur_theta_iq;
+        } else{
+          y_tilde_iq = y_selected - Z_iq*alpha_q - beta_kq0_vec -
+            B_iq*beta_kq - omega_vec - select_cur_theta_iq;
+        }
+        
+        arma::mat B_iqj = B_iq;
+        arma::vec B_iqj_wcoeff = trans(B_iqj) * y_tilde_iq;
+        
+        arma::mat vi = trans(B_iqj) * B_iqj;
+        Sigma_beta_sum_K = Sigma_beta_sum_K + vi;
+        
+        mu_beta_sum_K = mu_beta_sum_K + B_iqj_wcoeff;
+      }
+      
+      
+      // arma::mat Identity = arma::eye(L, L);
+      arma::mat V_beta = arma::inv_sympd(Sigma_beta_sum_K/sigma2(q) + K_mat/(tau_kq2(K-1,q)));
+      arma::vec mu_beta = V_beta * (mu_beta_sum_K/sigma2(q));
+      
+      beta_kq_update.tube(K-1,q) = rmvn_rcpp(1, mu_beta, V_beta).row(0);
+    }
+  } catch (const std::runtime_error& e) {
+    // Catch a std::runtime_error, which is thrown by Armadillo for errors such as dimension mismatches
+    Rcpp::Rcout << "Caught a runtime_error exception: " << e.what() << std::endl;
+  } catch (const std::exception& e) {
+    // Catch any other standard exceptions
+    Rcpp::Rcout << "Caught an exception: " << e.what() << std::endl;
+  } catch (...) {
+    // Catch all other exceptions
+    Rcpp::Rcout << "Caught an unknown exception!" << std::endl;
+  }
+  
+  
   //cout << "finish update xi in cpp " << endl;
-  return xi_kq_update;
+  return beta_kq_update;
   //gc();
 }
 
 
-//' @noRd
-// [[Rcpp::export]]
-arma::mat update_beta_kq0_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega,
-                              const arma::cube& theta_iq, const arma::vec& sigma2,
-                              const arma::mat& gamma_kq0, const arma::mat& nu_kq0,
-                              const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B,
-                              const arma::vec& g_cpp, const arma::cube& data_index){
-
-  int K = beta.n_rows;
-  int Q = beta.n_cols;
-  int L = B(0).n_slices;
-  //int n = y.n_rows;
-  int J_max = B(0).n_cols;
-  arma::mat beta_kq0_update(K, Q, arma::fill::zeros);
-
-  for (int k = 0; k < K-1; ++k){
-    for (int q = 0; q < Q; ++q){
-      double Sigma_beta_kq0_sum = 0;
-      double mu_beta_kq0_sum = 0;
-      arma::uvec index_k = find(g_cpp == k);
-
-      arma::vec beta_Kq = beta.tube(K-1, q);
-      arma::vec beta_kq = beta.tube(k, q);
-
-
-      for (auto i : index_k){
-        arma::uvec data_index_iq = find(data_index.tube(i,q) == 1);
-        //Rcpp::Rcout << "data_index_iq: " << data_index_iq << std::endl;
-        int Iq_j = data_index_iq.size();
-        arma::vec y_tilde_iq;
-
-        arma::mat B_iq_raw = B(i).subcube(q,0,1,q, J_max-1,L-1);
-        // B_iq_raw now is dim J_max*(L-1)
-        arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-        arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
-        arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-
-        arma::vec y_vec = arma::vectorise(y.tube(i, q));
-        arma::vec y_selected = y_vec.elem(data_index_iq);
-        arma::vec alpha_q = alpha.row(q).t();
-
-        arma::vec omega_vec(Iq_j, arma::fill::zeros);
-        omega_vec.fill(omega(i, q));
-
-        // extract theta_iq
-        arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-        arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-        y_tilde_iq = y_selected - Z_iq * alpha_q -
-          B_iq* beta_Kq - B_iq*beta_kq - omega_vec - select_cur_theta_iq;
-
-        mu_beta_kq0_sum = mu_beta_kq0_sum + sum(y_tilde_iq);
-
-        Sigma_beta_kq0_sum = Sigma_beta_kq0_sum + Iq_j;
-
-      }
-
-      double sigma_beta_kq0 = 1/ (Sigma_beta_kq0_sum/sigma2(q) + 1/(gamma_kq0(k,q)*nu_kq0(k,q)));
-      double mu_beta_kq0 = sigma_beta_kq0*mu_beta_kq0_sum/sigma2(q);
-      beta_kq0_update(k,q) = Rcpp::rnorm(1, mu_beta_kq0, sqrt(sigma_beta_kq0))[0];
-
-    }
-  }
-  return beta_kq0_update;
-}
 
 
 
 //' @noRd
 // [[Rcpp::export]]
-double logpost_omega_cpp(int i, const arma::rowvec& omega_i, const arma::mat& alpha, const arma::cube& beta,
-                         const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega,
-                         const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B, const arma::vec& g,
-                         const arma::cube& data_index, int K, int Q, int J_max){
-  // calculate the log-posterior for omega_i
-  // args: index of i-th subject, i from 0 to I-1 since it call by other Rcpp function
-  //    omega_i: omega values for i-subjects, as a rowvector length Q
-  double logpost = 0.0;
-
-  // calculate log-likelihood
-  int k = g(i) ; // index of class for i-th subject
-  //Rcpp::Rcout << "k =  " << k << "\n";
-  for (int q = 0; q < Q; ++q){
-    //Rcpp::Rcout << "q =  " << q << "\n";
-    arma::vec alpha_q = alpha.row(q).t();
-
-    arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1); // index of data for i-th subject at q-th response
-
-    arma::vec y_vec = arma::vectorise(y.tube(i, q));
-    arma::vec y_selected = y_vec.elem(data_index_iq);
-
-    arma::mat Z_iq_raw = Z(i).tube(q, 0, q, J_max-1);
-    arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-    //Rcpp::Rcout << "Z_iq dimensions: " << Z_iq.n_rows << " x " << Z_iq.n_cols << "\n";
-
-    arma::mat B_iq_raw = B(i).tube(q, 0, q, J_max-1);
-    arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-
-    arma::vec y_tilde_iq;
-
-    // extract theta_iq
-    arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-    arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-    arma::vec beta_Kq = beta.tube(K-1,q);
-    arma::vec beta_kq;
-
-    if(k != K-1){
-      beta_kq = beta.tube(k,q);
-    }
-
-    if (k == K - 1){
-      // if i-th subject in baseline class
-      y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - select_cur_theta_iq;
-    } else {
-      // if i-th subject not in baseline class
-      y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - B_iq * beta_kq - select_cur_theta_iq;
-    }
-    arma::rowvec y_tilde_iq_rowvec = y_tilde_iq.t();
-
-    int J_iq = data_index_iq.size();
-    arma::vec mu(J_iq, arma::fill::ones);
-
-    mu *= omega_i(q);
-    arma::rowvec mu_rowvec = mu.t();
-
-
-    arma::mat sigma_mat = arma::eye<arma::mat>(J_iq, J_iq) * sigma2(q);
-    logpost += dmvn_rcpp(y_tilde_iq_rowvec, mu_rowvec, sigma_mat, true);
-
-  }
-  //arma::rowvec omega_i_rowvec = omega_i.t();
-  arma::rowvec zeros = arma::zeros<arma::rowvec>(Q);
-  arma::rowvec omega_i_temp = omega_i;
-  logpost += dmvn_rcpp(omega_i_temp, zeros, Sigma_omega, true);
-
-  return logpost;
-}
+double logpost_omega_cpp(int i, const arma::rowvec& omega_i, 
+                          const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0,
+                          const arma::cube& theta_iq, const arma::vec& sigma2, const arma::mat& Sigma_omega,
+                          const arma::cube& y,const arma::cube& data_index, 
+                          const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z,  const arma::vec& g_cpp,
+                          int K, int Q, int J_max){
+   // calculate the log-posterior for omega_i
+   // args: index of i-th subject, i from 0 to I-1 since it call by other Rcpp function
+   //    omega_i: omega values for i-subjects, as a rowvector length Q
+   double logpost = 0.0;
+   
+   // calculate log-likelihood
+   int k = g_cpp(i) ; // index of class for i-th subject
+   //Rcpp::Rcout << "k =  " << k << "\n";
+   for (int q = 0; q < Q; ++q){
+     //Rcpp::Rcout << "q =  " << q << "\n";
+     
+     arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1); // index of data for i-th subject at q-th response
+     int J_iq = data_index_iq.size();
+     
+     arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+     arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+     arma::vec alpha_q = alpha.row(q).t();
+     
+     // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+     arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+     arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+     
+     arma::vec beta_Kq = beta.tube(K-1, q); 
+     arma::vec beta_kq = beta.tube(k, q);
+     
+     // // take vec_t*beta_kqt or vec_t*beta_Kqt
+     // arma::vec t_vec = t.tube(i, q);
+     // arma::vec t_selected = t_vec.elem(data_index_iq);
+     // 
+     // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+     // arma::vec t_beta_Kqt = beta_kqt(K-1,q)*t_selected;
+     
+     // take beta_kq0
+     arma::vec beta_kq0_vec(J_iq, arma::fill::zeros);
+     beta_kq0_vec.fill(beta_kq0(k,q));
+     
+     // extract theta_iq
+     arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+     arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+     
+     arma::vec y_vec = arma::vectorise(y.tube(i, q));
+     arma::vec y_selected = y_vec.elem(data_index_iq);
+     
+     arma::vec y_tilde_iq;
+     
+     if (k == K-1){ // baseline
+       y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - select_cur_theta_iq;
+     } else { // not baseline
+       y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - beta_kq0_vec -
+         B_iq * beta_kq - select_cur_theta_iq;
+     }
+     
+     arma::rowvec y_tilde_iq_rowvec = y_tilde_iq.t();
+     
+     arma::vec mu(J_iq, arma::fill::ones);
+     
+     mu *= omega_i(q);
+     arma::rowvec mu_rowvec = mu.t();
+     
+     arma::mat sigma_mat = arma::eye<arma::mat>(J_iq, J_iq) * sigma2(q);
+     logpost += dmvn_rcpp(y_tilde_iq_rowvec, mu_rowvec, sigma_mat, true);
+     
+   }
+   //arma::rowvec omega_i_rowvec = omega_i.t();
+   arma::rowvec zeros = arma::zeros<arma::rowvec>(Q);
+   arma::rowvec omega_i_temp = omega_i;
+   logpost += dmvn_rcpp(omega_i_temp, zeros, Sigma_omega, true);
+   
+   return logpost;
+ }
 
 
 //' @noRd
 // [[Rcpp::export]]
-arma::mat update_omega_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& omega,const arma::cube& theta_iq,
+arma::mat update_omega_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0,
+                           const arma::mat& omega,const arma::cube& theta_iq,
                            const arma::vec& sigma2, const arma::mat& Sigma_omega,
-                           const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B,
-                           const arma::vec& g,
-                           const arma::cube& data_index,const double omega_var_update = 0.04){
-
+                           const arma::cube& y, const arma::cube& data_index, 
+                           const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, 
+                           const arma::vec& g_cpp, const double omega_var_update = 0.04){
+  
   int K = beta.n_rows;
   int Q = beta.n_cols;
   int J_max = Z(0).n_cols;
   arma::mat omega_update = omega;
   int I = omega.n_rows;
-
+  
   for (int i = 0; i < I; i++){
-
+    
     // propose new omega_i
     arma::rowvec omega_i_row = omega_update.row(i);
     arma::vec omega_i = arma::conv_to<arma::vec>::from(omega_i_row); // convert rowvec to vec
     arma::mat var_mat = arma::eye(Q,Q) * omega_var_update;
     arma::mat omega_i_new = rmvn_rcpp(1, omega_i, var_mat);
-
+    
     arma::rowvec omega_i_new_row = omega_i_new.row(0);
-
+    
     // acceptance ratio
-    double ratio = logpost_omega_cpp(i, omega_i_new_row, alpha, beta,theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, K, Q, J_max) -
-      logpost_omega_cpp(i, omega_i_row, alpha, beta,theta_iq, sigma2, Sigma_omega, y, Z, B, g, data_index, K, Q, J_max);
-
+    double ratio = logpost_omega_cpp(i, omega_i_new_row, alpha, beta, beta_kq0, theta_iq, sigma2,
+                                     Sigma_omega, y, data_index, B, Z,  g_cpp, K, Q, J_max) -
+                                       logpost_omega_cpp(i, omega_i_row, alpha, beta, beta_kq0, theta_iq, sigma2,
+                                                         Sigma_omega, y, data_index, B, Z, g_cpp, K, Q, J_max);
+    
     // accept or reject
     if (log(R::runif(0, 1)) < ratio){
       omega_update.row(i) = omega_i_new.row(0);
     }
   }
-
+  
   return(omega_update);
 }
+
 
 
 //' @noRd
 // [[Rcpp::export]]
 double logpost_Sigma_omega_cpp(const arma::mat& Sigma_omega, const arma::mat& omega){
-
-  double logpost = 0.0;
-  arma::rowvec zeros = arma::zeros<arma::rowvec>(omega.n_cols);
-  int I = omega.n_rows; // Added a semicolon at the end
-
-  for (int i = 0; i < I; i++){
-    arma::rowvec omega_i = omega.row(i);
-    logpost += dmvn_rcpp(omega_i, zeros, Sigma_omega, true);
-  }
-
-  return logpost;
-}
+   
+   double logpost = 0.0;
+   arma::rowvec zeros = arma::zeros<arma::rowvec>(omega.n_cols);
+   int I = omega.n_rows; // Added a semicolon at the end
+   
+   for (int i = 0; i < I; i++){
+     arma::rowvec omega_i = omega.row(i);
+     logpost += dmvn_rcpp(omega_i, zeros, Sigma_omega, true);
+   }
+   
+   return logpost;
+ }
 
 
 
@@ -744,143 +623,148 @@ double logpost_Sigma_omega_cpp(const arma::mat& Sigma_omega, const arma::mat& om
 //' @noRd
 // [[Rcpp::export]]
 arma::mat update_Sigma_omega_cpp(const arma::mat& omega, const arma::mat& Sigma_omega, const double Sigma_omega_step = 0.008){
-
-  arma::mat Sigma_omega_update = Sigma_omega;
-  double eps = 1e-300;
-
-  int Q = Sigma_omega.n_rows;
-
-  for (int i = 0; i < Q; i++){
-    for (int j = 0; j < Q; j++){
-
-      if (i < j){
-        double lower = std::max(Sigma_omega_update(i, j) - Sigma_omega_step, -1.0 + eps);
-        double upper = std::min(Sigma_omega_update(i, j) + Sigma_omega_step, 1.0 - eps);
-
-        arma::mat Sigma_omega_new = Sigma_omega_update;
-        Sigma_omega_new(i, j) = R::runif(lower, upper);
-        Sigma_omega_new(j, i) = Sigma_omega_new(i, j);
-
-        if (Sigma_omega_new.is_sympd()){
-          double ratio = logpost_Sigma_omega_cpp(Sigma_omega_new, omega) -
-            logpost_Sigma_omega_cpp(Sigma_omega_update, omega);
-
-          if (std::log(R::runif(0, 1)) < ratio){
-            Sigma_omega_update = Sigma_omega_new;
-          }
-        }
-      }
-    }
-  }
-
-  return Sigma_omega_update;
-}
-
-
+   
+   arma::mat Sigma_omega_update = Sigma_omega;
+   double eps = 1e-300;
+   
+   int Q = Sigma_omega.n_rows;
+   
+   for (int i = 0; i < Q; i++){
+     for (int j = 0; j < Q; j++){
+       
+       if (i < j){
+         double lower = std::max(Sigma_omega_update(i, j) - Sigma_omega_step, -1.0 + eps);
+         double upper = std::min(Sigma_omega_update(i, j) + Sigma_omega_step, 1.0 - eps);
+         
+         arma::mat Sigma_omega_new = Sigma_omega_update;
+         Sigma_omega_new(i, j) = R::runif(lower, upper);
+         Sigma_omega_new(j, i) = Sigma_omega_new(i, j);
+         
+         if (Sigma_omega_new.is_sympd()){
+           double ratio = logpost_Sigma_omega_cpp(Sigma_omega_new, omega) -
+             logpost_Sigma_omega_cpp(Sigma_omega_update, omega);
+           
+           if (std::log(R::runif(0, 1)) < ratio){
+             Sigma_omega_update = Sigma_omega_new;
+           }
+         }
+       }
+     }
+   }
+   
+   return Sigma_omega_update;
+ }
 
 
- //' @noRd
+
+
+//' @noRd
 // [[Rcpp::export]]
-arma::cube update_theta_iq_cpp(const arma::mat& alpha,const arma::cube& beta, const arma::mat& omega,
-                              const arma::vec& sigma2,
-                           const arma::cube& data_index, const arma::cube& y, const arma::field<arma::cube>& B,
-                           const arma::field<arma::cube>& Z, const arma::vec& g,
-                           const arma::cube& t, const arma::vec& tau_q_vec,const arma::vec& lambda_q_vec ){
-  // Update the alpha
-  // args: 1: beta is K*Q*L at t-1 time
-  //       2: omega is the I*Q mat at t-1 time
-  //       3: sigma2 is the length Q col vect at t-1 time
-  // returns: the updates alpha
-
-
-  // Get dimensions from the data
-  int K = beta.n_rows;
-  int Q = beta.n_cols;
-  int I = g.n_elem;
-  int J_max = data_index.n_slices; // data_index in dim I*Q*J_max
-  //cout << "K:" << K << "  Q: "<< Q <<endl;
-  arma::cube theta_iq_update(I, Q, J_max, arma::fill::zeros);
-
-
-  for (int q = 0; q < Q; ++q){
-    for (int i = 0; i < I; i++){
-
-      // extract index
-      int k = g(i);
-      arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1);
-      int J_iq = data_index_iq.size();
-
-      // create the dynamic covariance matrix
-      arma::mat V_iq(J_iq, J_iq, arma::fill::zeros);
-      arma::vec mu_iq(J_iq, arma::fill::zeros);
-
-      // prepare for tilde_y
-      arma::vec y_vec = arma::vectorise(y.tube(i, q));
-      arma::vec y_selected = y_vec.elem(data_index_iq);
-
-      arma::mat Z_iq_raw = Z(i).tube(q, 0, q, J_max-1);
-      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-      arma::vec alpha_q = alpha.row(q).t();
-
-      arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1 );
-      //cout<< "B_iq_raw: " << B_iq_raw <<endl;
-      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-      arma::vec beta_Kq = beta.tube(K-1,q);
-      arma::vec beta_kq = beta.tube(k,q);
-      //Rcpp::Rcout << "beta_Kq dimensions: " << beta_Kq.n_rows << " x " << beta_Kq.n_cols << "\n";
-
-      // get the omega_i and rep it J_iq times
-      arma::vec omega_vec(data_index_iq.size(), arma::fill::zeros);
-      omega_vec.fill(omega(i, q));
-
-
-      arma::vec y_tilde_iq;
-      if (k == K-1){ // baseline
-        y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - omega_vec;
-
-      } else { // not baseline
-        y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - B_iq * beta_kq - omega_vec;
-      }
-      //create the current cov matrix
-      double lambda_q = lambda_q_vec(q);
-      double tau_q = tau_q_vec(q);
-
-      arma::mat cov_mat(J_iq, J_iq, arma::fill::eye);
-      for (int j = 0; j < J_iq; j++) {
-        for (int j_prime = j + 1; j_prime < J_iq; j_prime++) {
-          double diff = (t(i, q, data_index_iq(j)) - t(i, q, data_index_iq(j_prime)) )/lambda_q;
-          double cov_value = std::exp(-std::pow(diff, 2));
-          cov_mat(j, j_prime) = cov_value;
-          cov_mat(j_prime, j) = cov_value;
-        }
-      }
-      cov_mat = tau_q* cov_mat;
-
-      if(arma::det(cov_mat)<1e-35){
-        cov_mat.diag() += 1e-3;
-      }
-
-      arma::mat V_theta_iq_idx = cov_mat;
-
-
-      // get Sigma_q in the formula
-      arma::mat Sigma_q = sigma2(q) * eye<mat>(J_iq, J_iq);
-      // get V_theta in the formula
-      V_iq = arma::inv( arma::inv(Sigma_q) + arma::inv(V_theta_iq_idx) );
-      // get mu_theta in the formula
-      mu_iq = V_iq*(arma::inv(Sigma_q))*y_tilde_iq;
-      // do the update
-      arma::vec current_theta_iq = rmvn_rcpp(1, mu_iq, V_iq).row(0).t();
-
-      // store current update theta_iq to the cube we return
-      arma::vec temp_vec(J_max,fill::zeros);
-      temp_vec.elem(data_index_iq) = current_theta_iq;
-      theta_iq_update.tube(i, q) = temp_vec;
-
-    }
-  }
-  return theta_iq_update;
-}
+arma::cube update_theta_iq_cpp(const arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, 
+                                const arma::mat& omega, const arma::vec& sigma2,
+                                const arma::cube& y, const arma::cube& data_index, const arma::cube& t_std,const arma::cube& t_org, 
+                                const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, const arma::vec& g_cpp,
+                                const arma::vec& tau_q_vec,const arma::vec& lambda_q_vec ){
+   
+   // Get dimensions from the data
+   int K = beta.n_rows;
+   int Q = beta.n_cols;
+   int I = y.n_rows;
+   int J_max = data_index.n_slices; // data_index in dim I*Q*J_max
+   //cout << "K:" << K << "  Q: "<< Q <<endl;
+   arma::cube theta_iq_update(I, Q, J_max, arma::fill::zeros);
+   
+   
+   for (int q = 0; q < Q; ++q){
+     for (int i = 0; i < I; i++){
+       
+       // extract index
+       int k = g_cpp(i);
+       arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1);
+       int J_iq = data_index_iq.size();
+       
+       arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+       arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+       arma::vec alpha_q = alpha.row(q).t();
+       
+       // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+       arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+       arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+       
+       arma::vec beta_Kq = beta.tube(K-1, q); 
+       arma::vec beta_kq = beta.tube(k, q);
+       
+       // take vec_t*beta_kqt or vec_t*beta_Kqt
+       arma::vec t_vec = t_std.tube(i, q);
+       arma::vec t_selected = t_vec.elem(data_index_iq);
+       
+       // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+       // arma::vec t_beta_Kqt = beta_kqt(K-1,q)*t_selected;
+       
+       // take beta_kq0
+       arma::vec beta_kq0_vec(J_iq, arma::fill::zeros);
+       beta_kq0_vec.fill(beta_kq0(k,q));
+       
+       // take omega_i
+       arma::vec omega_vec(J_iq, arma::fill::zeros);
+       omega_vec.fill(omega(i, q));
+       
+       arma::vec y_vec = arma::vectorise(y.tube(i, q));
+       arma::vec y_selected = y_vec.elem(data_index_iq);
+       
+       arma::vec y_tilde_iq;
+       
+       // create the dynamic covariance matrix
+       arma::mat V_iq(J_iq, J_iq, arma::fill::zeros);
+       arma::vec mu_iq(J_iq, arma::fill::zeros);
+       
+       if (k == K-1){ // baseline
+         y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - omega_vec;
+       } else { // not baseline
+         y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - beta_kq0_vec -
+           B_iq * beta_kq - omega_vec;
+       }
+       
+       //create the current cov matrix
+       double lambda_q = lambda_q_vec(q);
+       double tau_q = tau_q_vec(q);
+       
+       arma::mat cov_mat(J_iq, J_iq, arma::fill::eye);
+       for (int j = 0; j < J_iq; j++) {
+         for (int j_prime = j + 1; j_prime < J_iq; j_prime++) {
+           double diff = (t_org(i, q, data_index_iq(j)) - t_org(i, q, data_index_iq(j_prime)) )/lambda_q;
+           double cov_value = std::exp(-std::pow(diff, 2));
+           cov_mat(j, j_prime) = cov_value;
+           cov_mat(j_prime, j) = cov_value;
+         }
+       }
+       cov_mat = tau_q* cov_mat;
+       
+       if(abs(arma::det(cov_mat))<1e-35){
+         cov_mat.diag() += 1e-4;
+       }
+       
+       arma::mat V_theta_iq_idx = cov_mat;
+       
+       
+       // get Sigma_q in the formula
+       arma::mat Sigma_q = sigma2(q) * eye<mat>(J_iq, J_iq);
+       // get V_theta in the formula
+       V_iq = arma::inv( arma::inv(Sigma_q) + arma::inv(V_theta_iq_idx) );
+       // get mu_theta in the formula
+       mu_iq = V_iq*(arma::inv(Sigma_q))*y_tilde_iq;
+       // do the update
+       arma::vec current_theta_iq = rmvn_rcpp(1, mu_iq, V_iq).row(0).t();
+       
+       // store current update theta_iq to the cube we return
+       arma::vec temp_vec(J_max,fill::zeros);
+       temp_vec.elem(data_index_iq) = current_theta_iq;
+       theta_iq_update.tube(i, q) = temp_vec;
+       
+     }
+   }
+   return theta_iq_update;
+ }
 
 
 //' @noRd
@@ -955,113 +839,115 @@ arma::vec update_tau_q_cpp(const arma::cube& theta_iq, double a_tau, double b_ta
 //' @noRd
 // [[Rcpp::export]]
 double logpost_lambda_normpart_cpp(double q, const arma::cube& theta_iq,
-                                   double lambda_q, double tau_q ,
-                                   const arma::cube& data_index,
-                                   const arma::cube& t){
-  double threshold = 1e-35;
-  //double epsilon = 1e-4;
-  double logpost_sum = 0.0;
-  int I = theta_iq.n_rows;
+                                    double lambda_q, double tau_q ,
+                                    const arma::cube& data_index,
+                                    const arma::cube& t){
+   double threshold = 1e-35;
+   double epsilon = 1e-4;
+   double logpost_sum = 0.0;
+   int I = theta_iq.n_rows;
+   
+   
+   for (int i = 0; i < I; i++){
+     
+     //cout << "i:" << i << " q: "<< q <<endl; 
+     //cout << " current  lambda_q:" << lambda_q << endl;
+     
+     // value for evaluation
+     arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1);
+     int J_iq = data_index_iq.size();
+     
+     // extract theta_iq
+     arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+     arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+     
+     //create the current cov matrix
+     arma::mat cov_mat(J_iq, J_iq, arma::fill::eye);
+     for (int j = 0; j < J_iq; j++) {
+       for (int j_prime = j + 1; j_prime < J_iq; j_prime++) {
+         double diff = (t(i, q, data_index_iq(j)) - t(i, q, data_index_iq(j_prime)) )/lambda_q;
+         double cov_value = std::exp(-std::pow(diff, 2));
+         cov_mat(j, j_prime) = cov_value;
+         cov_mat(j_prime, j) = cov_value;
+       }
+     }
+     cov_mat = tau_q* cov_mat;
+     
+     double det_val = arma::det(cov_mat);
+     
+     // If determinant is less than the threshold, add epsilon to the diagonal
+     if(abs(det_val) < threshold) {
+       cov_mat.diag() += epsilon;
+       // return -1e30;
+     }
+     //cov_mat.diag() += epsilon;
+     
+     //cout << " cov_mat :" << cov_mat << endl;
+     
+     // create the mean
+     arma::vec mean_vec(J_iq,arma::fill::zeros);
+     
+     
+     // do the transfer
+     arma::rowvec mean_rowvec = mean_vec.t();
+     arma::rowvec theta_rowvec = select_cur_theta_iq.t();
+     
+     
+     logpost_sum += dmvn_rcpp(theta_rowvec, mean_rowvec, cov_mat, true);
+   }
+   
+   return logpost_sum;
+ }
 
-
-  for (int i = 0; i < I; i++){
-
-    //cout << "i:" << i << " q: "<< q <<endl;
-    //cout << " current  lambda_q:" << lambda_q << endl;
-
-    // value for evaluation
-    arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1);
-    int J_iq = data_index_iq.size();
-
-    // extract theta_iq
-    arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-    arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-    //create the current cov matrix
-    arma::mat cov_mat(J_iq, J_iq, arma::fill::eye);
-    for (int j = 0; j < J_iq; j++) {
-      for (int j_prime = j + 1; j_prime < J_iq; j_prime++) {
-        double diff = (t(i, q, data_index_iq(j)) - t(i, q, data_index_iq(j_prime)) )/lambda_q;
-        double cov_value = std::exp(-std::pow(diff, 2));
-        cov_mat(j, j_prime) = cov_value;
-        cov_mat(j_prime, j) = cov_value;
-      }
-    }
-    cov_mat = tau_q* cov_mat;
-
-    double det_val = arma::det(cov_mat);
-
-    // If determinant is less than the threshold, add epsilon to the diagonal
-    if(det_val < threshold) {
-      cov_mat.diag() += 1e-3;
-      // return -1e30;
-    }
-    //cov_mat.diag() += epsilon;
-
-    //cout << " cov_mat :" << cov_mat << endl;
-
-    // create the mean
-    arma::vec mean_vec(J_iq,arma::fill::zeros);
-
-
-    // do the transfer
-    arma::rowvec mean_rowvec = mean_vec.t();
-    arma::rowvec theta_rowvec = select_cur_theta_iq.t();
-
-
-    logpost_sum += dmvn_rcpp(theta_rowvec, mean_rowvec, cov_mat, true);
-  }
-
-  return logpost_sum;
-}
 
 //' @importFrom Rcpp sourceCpp
- //' @noRd
+//' @noRd
 // [[Rcpp::export]]
 arma::vec update_lambda_q_cpp(const arma::vec& lambda, double a_lam, double b_lam,
-                              const arma::cube& theta_iq, const arma::vec& tau_q_vec,
-                              const arma::cube& data_index, const arma::cube& t,
-                              const double lambda_step = 0.1){
+                               const arma::cube& theta_iq, const arma::vec& tau_q_vec,
+                               const arma::cube& data_index, const arma::cube& t,
+                               const double lambda_step = 0.1){
+   
+   //int I = theta_iq.n_rows;
+   int Q = theta_iq.n_cols;
+   
+   arma::vec lambda_update = lambda;
+   double eps = 1e-10;
+   int accepted = 0; // Counter for accepted proposals
+   
+   for (int q = 0; q < Q; ++q){
+     
+     double lower = std::max(lambda(q) - lambda_step, 0.01 + eps);
+     double upper = std::min(lambda(q) + lambda_step, 100 - eps);
+     
+     double lambda_q_current = lambda(q);
+     double lambda_q_new = R::runif(lower, upper);
+     
+     double tau_q_current = tau_q_vec(q);
+     
+     double sum_of_norm_new = logpost_lambda_normpart_cpp(q, theta_iq,
+                                                          lambda_q_new,  tau_q_current,
+                                                          data_index,t );
+     double sum_of_norm_cur = logpost_lambda_normpart_cpp(q, theta_iq,
+                                                          lambda_q_current,  tau_q_current,
+                                                          data_index,t );
+     
+     double log_IG_new = dinv_gamma_rcpp(lambda_q_new, a_lam, b_lam, true);
+     double log_IG_cur = dinv_gamma_rcpp(lambda_q_current, a_lam, b_lam, true);
+     
+     
+     double Ratio = (log_IG_new + sum_of_norm_new) - (log_IG_cur + sum_of_norm_cur);
+     
+     if(std::log(R::runif(0, 1)) < Ratio){
+       lambda_update(q) = lambda_q_new;
+       accepted++;
+     }
+   }
+   
+   
+   return lambda_update;
+ }
 
-  //int I = theta_iq.n_rows;
-  int Q = theta_iq.n_cols;
-
-  arma::vec lambda_update = lambda;
-  double eps = 1e-10;
-  int accepted = 0; // Counter for accepted proposals
-
-  for (int q = 0; q < Q; ++q){
-
-    double lower = std::max(lambda(q) - lambda_step, 0.01 + eps);
-    double upper = std::min(lambda(q) + lambda_step, 20 - eps);
-
-    double lambda_q_current = lambda(q);
-    double lambda_q_new = R::runif(lower, upper);
-
-    double tau_q_current = tau_q_vec(q);
-
-    double sum_of_norm_new = logpost_lambda_normpart_cpp(q, theta_iq,
-                                                         lambda_q_new,  tau_q_current,
-                                                     data_index,t );
-    double sum_of_norm_cur = logpost_lambda_normpart_cpp(q, theta_iq,
-                                                         lambda_q_current,  tau_q_current,
-                                                         data_index,t );
-
-    double log_IG_new = dinv_gamma_rcpp(lambda_q_new, a_lam, b_lam, true);
-    double log_IG_cur = dinv_gamma_rcpp(lambda_q_current, a_lam, b_lam, true);
-
-
-    double Ratio = (log_IG_new + sum_of_norm_new) - (log_IG_cur + sum_of_norm_cur);
-
-    if(std::log(R::runif(0, 1)) < Ratio){
-      lambda_update(q) = lambda_q_new;
-      accepted++;
-    }
-  }
-
-
-  return lambda_update;
-}
 
 
 //' @noRd
@@ -1122,68 +1008,86 @@ Rcpp::List update_lambda_q_cpp_wth_accept(const arma::vec& lambda, double a_lam,
 
 //' @noRd
 // [[Rcpp::export]]
-arma::vec update_sigma2_cpp(arma::mat& alpha, arma::cube& beta, arma::mat& omega,const arma::cube& theta_iq,
-                            const arma::cube& y, const arma::field<arma::cube>& Z, const arma::field<arma::cube>& B,
-                            const arma::cube& data_index, const arma::vec& g,
-                            double h_1, double h_2){
-  int K = beta.n_rows;
-  int Q = beta.n_cols;
-  int I = g.n_elem;
-  int J_max = Z(0).n_cols;
-
-  arma::vec sigma2_update(Q, arma::fill::zeros);
-
-  for (int q = 0; q < Q; ++q){
-
-    double y_tilde_sum = 0.0;
-
-    arma::mat data_index_q = data_index.tube(0, q, I - 1, q);
-    int n_iq = arma::accu(data_index_q);
-
-    for (int i = 0; i < I; ++i){
-      int k = g(i); // index of class for i-th subject
-
-      arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1); // index of data for i-th subject at q-th response
-
-      arma::mat B_iq_raw = B(i).tube(q, 0, q, J_max-1);
-      arma::mat B_iq = B_iq_raw.rows(data_index_iq);
-      arma::vec beta_Kq = beta.tube(K-1, q);
-      arma::vec beta_kq = beta.tube(k , q);
-
-      arma::mat Z_iq_raw = Z(i).tube(q, 0, q, J_max-1);
-      arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
-      arma::vec alpha_q = alpha.row(q).t();
-
-      arma::vec y_vec = arma::vectorise(y.tube(i, q));
-      arma::vec y_selected = y_vec.elem(data_index_iq);
-
-      arma::vec omega_vec(data_index_iq.size(), arma::fill::zeros);
-      omega_vec.fill(omega(i, q));
-
-      // extract theta_iq
-      arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
-      arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
-
-      arma::vec y_tilde_iq;
-      if (k == K-1){ // baseline
-        y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - omega_vec - select_cur_theta_iq;
-      } else { // not baseline
-        y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - B_iq * beta_kq -
-          omega_vec - select_cur_theta_iq;
-      }
-
-      // y_tilde_sum += arma::accu(arma::square(y_tilde_iq));
-      y_tilde_sum += dot(y_tilde_iq,y_tilde_iq);
-    }
-
-    double h_1_star = h_1 + n_iq / 2;
-    double h_2_star = h_2 + y_tilde_sum / 2;
-
-    sigma2_update(q) = rinvgamma_rcpp(h_1_star, h_2_star);
-  }
-
-  return sigma2_update;
-}
+arma::vec update_sigma2_cpp(arma::mat& alpha, const arma::cube& beta, const arma::mat& beta_kq0, 
+                             arma::mat& omega, const arma::cube& theta_iq,
+                             const arma::cube& y, const arma::cube& data_index, 
+                             const arma::field<arma::cube>& B, const arma::field<arma::cube>& Z, 
+                             const arma::vec& g_cpp,
+                             double h_1, double h_2){
+   int K = beta.n_rows;
+   int Q = beta.n_cols;
+   int I = y.n_rows;
+   int J_max = Z(0).n_cols;
+   
+   arma::vec sigma2_update(Q, arma::fill::zeros);
+   
+   for (int q = 0; q < Q; ++q){
+     
+     double y_tilde_sum = 0.0;
+     
+     arma::mat data_index_q = data_index.tube(0, q, I - 1, q);
+     int n_iq = arma::accu(data_index_q);
+     
+     for (int i = 0; i < I; ++i){
+       int k = g_cpp(i); // index of class for i-th subject
+       
+       arma::uvec data_index_iq = arma::find(data_index.tube(i, q) == 1); // index of data for i-th subject at q-th response
+       int J_iq = data_index_iq.size();
+       
+       arma::mat Z_iq_raw = Z(i).tube(q,0,q, J_max-1 );
+       arma::mat Z_iq = Z_iq_raw.rows(data_index_iq);
+       arma::vec alpha_q = alpha.row(q).t();
+       
+       // take B[i,q,index_index_iq,1:L], i.e do not count intercept part (we do not have intercept 1 on B)
+       arma::mat B_iq_raw = B(i).tube(q,0,q, J_max-1);
+       arma::mat B_iq = B_iq_raw.rows(data_index_iq);
+       
+       arma::vec beta_Kq = beta.tube(K-1, q); 
+       arma::vec beta_kq = beta.tube(k, q);
+       
+       // take vec_t*beta_kqt or vec_t*beta_Kqt
+       // arma::vec t_vec = t.tube(i, q);
+       // arma::vec t_selected = t_vec.elem(data_index_iq);
+       // 
+       // arma::vec t_beta_kqt = beta_kqt(k,q)*t_selected;
+       // arma::vec t_beta_Kqt = beta_kqt(K-1,q)*t_selected;
+       
+       // take beta_kq0
+       arma::vec beta_kq0_vec(J_iq, arma::fill::zeros);
+       beta_kq0_vec.fill(beta_kq0(k,q));
+       
+       // take omega_i
+       arma::vec omega_vec(J_iq, arma::fill::zeros);
+       omega_vec.fill(omega(i, q));
+       
+       // extract theta_iq
+       arma::vec cur_theta_iq = arma::vectorise(theta_iq.tube(i,q));
+       arma::vec select_cur_theta_iq = cur_theta_iq.elem(data_index_iq);
+       
+       arma::vec y_vec = arma::vectorise(y.tube(i, q));
+       arma::vec y_selected = y_vec.elem(data_index_iq);
+       
+       arma::vec y_tilde_iq;
+       
+       if (k == K-1){ // baseline
+         y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - omega_vec - select_cur_theta_iq;
+       } else { // not baseline
+         y_tilde_iq = y_selected - Z_iq * alpha_q - B_iq * beta_Kq - beta_kq0_vec -
+           B_iq * beta_kq - omega_vec - select_cur_theta_iq;
+       }
+       
+       // y_tilde_sum += arma::accu(arma::square(y_tilde_iq));
+       y_tilde_sum += dot(y_tilde_iq,y_tilde_iq);
+     }
+     
+     double h_1_star = h_1 + n_iq / 2;
+     double h_2_star = h_2 + y_tilde_sum / 2;
+     
+     sigma2_update(q) = rinvgamma_rcpp(h_1_star, h_2_star);
+   }
+   
+   return sigma2_update;
+ }
 
 
 
