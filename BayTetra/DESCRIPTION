@@ -19,9 +19,8 @@ RoxygenNote: 7.3.1
 LinkingTo: 
     Rcpp(>= 1.0.5),RcppArmadillo(>= 0.12.2.0.0)
 Imports: 
-    MCMCpack(>= 1.6-3),MASS(>= 7.3-58.4),Rcpp(>= 1.0.10),splines(>= 4.3.0),
-    dplyr(>= 1.1.2),tmvtnorm(>= 1.5),Matrix(>= 1.5-4),rstan(>= 2.20.0),
-    mvtnorm(>= 1.1-1),truncnorm(>= 1.0-8),pracma(>= 2.3.3),loo(>= 2.6.0),GIGrvg(>= 0.8)
+    MCMCpack(>= 1.6-3),MASS(>= 7.3-58.4),Rcpp(>= 1.0.10),splines(>= 4.2.3),
+    rstan(>= 2.20.0),truncnorm(>= 1.0-8),pracma(>= 2.3.3),GIGrvg(>= 0.8)
 Depends: 
     R (>= 4.2)
 SystemRequirements: GNU make

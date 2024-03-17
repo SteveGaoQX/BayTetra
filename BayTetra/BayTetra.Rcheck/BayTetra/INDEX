@@ -1,6 +1,0 @@
-Generate_simulated_data
-                        Generate Simulated Data
-Test_BayTetra           Hypothesis Testing for BayTetra
-ex_data                 Example Longitudinal Data
-mcmc_BayTetra           Posterior inference for BayTetra
-summary.Test_BayTetra   Summarize Results of BayTetra Hypothesis Test
