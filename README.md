@@ -8,8 +8,8 @@ Semiparametric Approach for Testing Trajectory Differences'' by Jin, W & Gao, Q 
 ## Steps to install the BayTetra
 ## 1.List of dependent packages
 dep_packages <- c(
-    "Rcpp", "RcppArmadillo", "MCMCpack", "MASS", "splines", "dplyr", "tmvtnorm", "Matrix",
-    "rstan", "mvtnorm", "truncnorm", "pracma", "loo","GIGrvg"
+    "Rcpp", "RcppArmadillo", "MCMCpack", "MASS", "splines", "Matrix",
+    "rstan", "mvtnorm", "truncnorm", "pracma", "GIGrvg"
 )
 
 ## 2.Check if these necessary packages are already installed and install them if they are not
@@ -24,9 +24,9 @@ install.packages("BayTetra_0.1.0.tar.gz", repos = NULL), which is a source file,
 
 ## 4.Example_code.R provides an example of how to quickly implements the BayTetra
 
-## 5.if you want to use the ex_data inside the package, using:
-devtools::load_all("BayTetra") ;\\
-data("ex_data", package = "BayTetra")
+## 5.if you want to use the ex_data inside the package(after installation), using:
+library(BayTetra)
+data("ex_data")
 
 
 ## 6.BayTetra.pdf is the Roxygen file introduced the details of BayTetra package
